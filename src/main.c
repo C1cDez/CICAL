@@ -6,12 +6,15 @@
 #include "cical.h"
 
 
-#define DEFAULT_TOKENS_MAXCOUNT 1024
-static token_t TOKENS[DEFAULT_TOKENS_MAXCOUNT] = { 0 };
+#define SILENT_PRINT "\x1b[30;1;3m"
+#define NORMAL_PRINT "\x1b[0m"
+#define PURPLE_PRINT "\x1b[35m"
+#define YELLOW_PRINT "\x1b[33m"
+#define RED_PRINT "\x1b[31m"
 
 static void printerr(int code)
 {
-	printf("ERROR: %x, ", code);
+	printf(RED_PRINT "ERROR: %x, ", code);
 	switch (code)
 	{
 	case ERROR_LEXER_UNDEFINED_SYMBOL: printf("Undefined symbol.\n"); break;
@@ -25,7 +28,12 @@ static void printerr(int code)
 	case -1: printf("somthing went wrong.\n"); break;
 	default: printf("[UNDEFINED]\n");
 	}
+	printf(NORMAL_PRINT);
 }
+
+
+#define DEFAULT_TOKENS_MAXCOUNT 1024
+static token_t TOKENS[DEFAULT_TOKENS_MAXCOUNT] = { 0 };
 
 static int PRECISION = 6;
 
@@ -46,7 +54,7 @@ static void handle_line(const char* line)
 	{
 		annihilate_tree(node);
 		if (cr.error) { err = cr.error; goto end; }
-		printf("= %.*f\n", PRECISION, cr.value);
+		printf(YELLOW_PRINT "= %.*f\n" NORMAL_PRINT, PRECISION, cr.value);
 	}
 
 	err = 0;
@@ -56,8 +64,7 @@ end:
 }
 
 
-#define SILENT_PRINT "\x1b[30;1;3m"
-#define NORMAL_PRINT "\x1b[0m"
+
 int main()
 {
 	printf("Welcome to CICAL (C Interpretable Calculator)\n" SILENT_PRINT "Use !h for help\n" NORMAL_PRINT);
@@ -65,8 +72,10 @@ int main()
 	char line[128] = { 0 };
 	while (1)
 	{
-		printf(">>> ");
+		printf(PURPLE_PRINT ">>>" NORMAL_PRINT " ");
 		fgets(line, 128, stdin);
+		if (line[0] == 0) break;
+
 		line[strlen(line) - 1] = 0;
 
 		if (line[0] == '!')
