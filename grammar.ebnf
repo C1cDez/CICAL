@@ -1,0 +1,16 @@
+(* digits = !TOKEN_NUMBER! *)
+(* alpha = !TOKEN_ALPHA! *)
+(* literal = !TOKEN_LITERAL! *)
+
+
+number = digits , [ "." , digits ] ;
+variable = alpha , [ digits ] | literal-const ;
+
+expression = term , { ("+" | "-") , term } ;
+term = factor , { ("*" | "/") , factor | super } ;
+factor = [ "-" ] , super ;
+super = primary, [ "^" , factor ] ;
+primary = number | variable | function | "(" , expression, ")" ;
+function = literal , primary ;
+
+statement = [ variable , "=" ] , expression ;
