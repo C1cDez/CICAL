@@ -1,4 +1,4 @@
-# CICAl
+# CICAL
 
 CICAL (C Interpretable Calculator) is a console calculator
 capable of handling complex algebraic expressions
