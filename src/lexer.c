@@ -18,6 +18,7 @@ int tokenize_line(const char* line, token_t* tokens, int maxsize)
 
 		if (c == ',') tok->type = TOKEN_COMMA;
 		else if (c == '.') tok->type = TOKEN_DOT;
+		else if (c == '|') tok->type = TOKEN_BAR;
 		else if (c == '(' || c == ')')
 		{
 			tok->type = TOKEN_BRACKET;
@@ -39,6 +40,7 @@ int tokenize_line(const char* line, token_t* tokens, int maxsize)
 				i++; k++;
 			}
 			i--;
+			tok->type = TOKEN_NUMBER;
 		}
 		else if (isalpha(c))
 		{

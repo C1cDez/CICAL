@@ -13,6 +13,8 @@ void annihilate_tree(ast_node_t* node)
 	free(node);
 }
 
+#define NEW_NODE() calloc(1, sizeof(ast_node_t))
+
 typedef struct
 {
 	int remaining;		// how much tokens AFTER current is valid
@@ -26,12 +28,15 @@ typedef struct
 // -: error
 
 static int parse_number(context_t ctx);
+static int parse_identifier(context_t ctx);
 static int parse_variable(context_t ctx);
 static int parse_primary(context_t ctx);
-static int parse_super(context_t ctx);
+static int parse_power(context_t ctx);
 static int parse_factor(context_t ctx);
 static int parse_term(context_t ctx);
 static int parse_expression(context_t ctx);
+static int parse_func_params(context_t ctx);
+static int parse_func_decl(context_t ctx);
 static int parse_function(context_t ctx);
 static int parse_statement(context_t ctx);
 
@@ -58,53 +63,180 @@ static int parse_number(context_t ctx)
 	return skip;
 }
 
-static int parse_variable(context_t ctx)
+static int parse_identifier(context_t ctx)
 {
 	if (ctx.current[0].type == TOKEN_ALPHA)
 	{
-		int skip = 1;
-
-		ctx.node->type = NODE_VARIABLE;
-		ctx.node->variable.sym = ctx.current[0].data[0];
-		if (ctx.remaining >= 1 && ctx.current[1].type == TOKEN_NUMBER)
-		{
-			ctx.node->variable.ident = atoi(ctx.current[1].data);
-			skip = 2;
-		}
-		else ctx.node->variable.ident = -1;
-
-		return skip;
+		ctx.node->ident.type = IDENTIFIER_SYMBOLIC;
+		ctx.node->ident.sym = ctx.current[0].data[0];
 	}
-	else if (ctx.current[0].type == TOKEN_LITERAL && get_literal(ctx.current[0].data[0]).type == LITERAL_CONST)
+	else if (ctx.current[0].type == TOKEN_LITERAL)
 	{
-		ctx.node->type = NODE_CONST;
-		ctx.node->variable.sym = 0xff;
-		ctx.node->variable.ident = ctx.current[0].data[0];
-		return 1;
+		ctx.node->ident.type = IDENTIFIER_LITERAL;
+		ctx.node->ident.litid = ctx.current[0].data[0];
 	}
 	else return 0;
+
+	if (ctx.remaining >= 1 && ctx.current[1].type == TOKEN_NUMBER)
+	{
+		ctx.node->ident.subscript = atoi(ctx.current[1].data);
+		return 2;
+	}
+	else
+	{
+		ctx.node->ident.subscript = -1;
+		return 1;
+	}
 }
+static int parse_variable(context_t ctx)
+{
+	ctx.node->type = NODE_VARIABLE;
+	int skip = parse_identifier(ctx);
+	if (ctx.current[0].type == TOKEN_LITERAL && get_literal(ctx.node->ident.litid).type != LITERAL_CONST)
+		return 0;
+	else return skip;
+}
+
+static int parse_func_params(context_t ctx)
+{
+	int skip = -1;
+	ast_node_t* tempnode = ctx.node;
+	do
+	{
+		skip++;
+
+		ast_node_t* exprnode = NEW_NODE();
+		if (!exprnode) return -1;
+		context_t exprctx = { .current = ctx.current + skip, .remaining = ctx.remaining - skip, .node = exprnode };
+		int exprskip = parse_expression(exprctx);
+
+		if (exprskip <= 0)
+		{
+			if (ctx.node->right) annihilate_tree(ctx.node->right);
+			return exprskip;
+		}
+
+		tempnode->type = NODE_FUNC_PARAM_JOINT;
+		tempnode->left = exprnode;
+		ast_node_t* newtempnode = NEW_NODE();
+		if (!newtempnode) return -1;
+		tempnode->right = newtempnode;
+		tempnode = newtempnode;
+
+		skip += exprskip;
+	} while (skip <= ctx.remaining && ctx.current[skip].type == TOKEN_COMMA);
+
+	ast_node_t* temp = ctx.node;
+	while (temp->right->type == NODE_FUNC_PARAM_JOINT)
+		temp = temp->right;
+
+	free(temp->right);
+	temp->right = NULL;
+
+	return skip;
+}
+static int parse_function(context_t ctx)
+{
+	ctx.node->type = NODE_FUNC_CALL;
+
+	if (ctx.current[0].type == TOKEN_LITERAL)
+	{
+		literal_t lit = get_literal(ctx.current[0].data[0]);
+		if (lit.type == LITERAL_FUNCTION && lit.argcount == 1)	// std-ufl
+		{
+			ast_node_t* argnode = NEW_NODE();
+			context_t argctx = { .current = ctx.current + 1, .remaining = ctx.remaining - 1, .node = argnode };
+			int skip = parse_primary(argctx);
+
+			if (skip < 0)
+			{
+				annihilate_tree(argnode);
+				return skip;
+			}
+			else if (skip > 0)
+			{
+				ast_node_t* jointnode = NEW_NODE();
+				if (!jointnode) return -1;
+				jointnode->type = NODE_FUNC_PARAM_JOINT;
+				jointnode->left = argnode;
+				jointnode->right = NULL;
+
+				ctx.node->ident.type = IDENTIFIER_LITERAL;
+				ctx.node->ident.litid = ctx.current[0].data[0];
+				ctx.node->ident.subscript = -1;
+				ctx.node->left = jointnode;
+				return skip + 1;
+			}
+			else
+				annihilate_tree(argnode);
+		}
+	}
+
+	int skip = parse_identifier(ctx);   // func-ident
+	if (skip <= 0) return skip;
+
+	if (!does_function_exist(ctx.node->ident))
+		return 0;
+	if (ctx.current[skip].type != TOKEN_BRACKET || ctx.current[skip].data[0] != '(')
+		return 0;
+
+	skip++;
+
+	ast_node_t* paramsnode = NEW_NODE();
+	context_t paramsctx = { .current = ctx.current + skip, .remaining = ctx.remaining - skip, .node = paramsnode };
+	int paramsskip = parse_func_params(paramsctx);
+	if (paramsskip <= 0)
+	{
+		annihilate_tree(paramsnode);
+		return paramsskip;
+	}
+	
+	skip += paramsskip;
+
+	if (ctx.current[skip].type != TOKEN_BRACKET || ctx.current[skip].data[0] != ')')
+		return ERROR_PARSER_UNCLOSED_BRACKET;
+
+	ctx.node->left = paramsnode;
+	ctx.node->right = NULL;
+
+	return skip + 1;
+}
+
 
 static int parse_primary(context_t ctx)
 {
 	int skip = 0;
 	if ((skip = parse_number(ctx))) return skip;
-	else if ((skip = parse_variable(ctx))) return skip;
 	else if ((skip = parse_function(ctx))) return skip;
+	else if ((skip = parse_variable(ctx))) return skip;
 	else if (ctx.current[0].type == TOKEN_BRACKET && ctx.current[0].data[0] == '(')
 	{
 		context_t exprctx = { .current = ctx.current + 1, .remaining = ctx.remaining - 1, .node = ctx.node };
-		skip = parse_expression(exprctx);
-		if (skip <= 0) return skip;
-		if (ctx.current[skip + 1].type == TOKEN_BRACKET && ctx.current[skip + 1].data[0] == ')') return skip + 2;
+		skip = 1 + parse_expression(exprctx);
+		if (skip <= 1) return skip - 1;
+		if (ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].data[0] == ')') return skip + 1;
+		else return ERROR_PARSER_UNCLOSED_BRACKET;
+	}
+	else if (ctx.current[0].type == TOKEN_BAR)
+	{
+		ast_node_t* exprnode = NEW_NODE();
+		context_t exprctx = { .current = ctx.current + 1, .remaining = ctx.remaining - 1, .node = exprnode };
+		skip = 1 + parse_expression(exprctx);
+		if (skip <= 1) return skip - 1;
+		if (ctx.current[skip].type == TOKEN_BAR)
+		{
+			ctx.node->type = NODE_ABS;
+			ctx.node->left = exprnode;
+			return skip + 1;
+		}
 		else return ERROR_PARSER_UNCLOSED_BRACKET;
 	}
 	return 0;
 }
 
-static int parse_super(context_t ctx)
+static int parse_power(context_t ctx)
 {
-	ast_node_t* tempnode = calloc(1, sizeof(ast_node_t));
+	ast_node_t* tempnode = NEW_NODE();
 	if (!tempnode) return -1;
 	context_t tempctx = ctx;
 	tempctx.node = tempnode;
@@ -121,7 +253,7 @@ static int parse_super(context_t ctx)
 	token_t* cur = ctx.current + skip;
 	if (cur->type == TOKEN_OPERATION && cur->data[0] == '^')
 	{
-		ast_node_t* expnode = calloc(1, sizeof(ast_node_t));
+		ast_node_t* expnode = NEW_NODE();
 		if (!expnode) return -1;
 
 		context_t expctx = { .current = cur + 1, .remaining = ctx.remaining - skip - 1, .node = expnode };
@@ -150,21 +282,21 @@ static int parse_factor(context_t ctx)
 {
 	if (ctx.current[0].type == TOKEN_OPERATION && ctx.current[0].data[0] == '-')
 	{
-		ast_node_t* newnode = calloc(1, sizeof(ast_node_t));
+		ast_node_t* newnode = NEW_NODE();
 		if (!newnode) return -1;
 		ctx.node->type = NODE_UNARY_MINUS;
 		ctx.node->left = newnode;
 
 		context_t newctx = { .current = ctx.current + 1, .remaining = ctx.remaining - 1, .node = newnode };
-		int skip = parse_super(newctx);
+		int skip = parse_power(newctx);
 		return skip <= 0 ? skip : (skip + 1);
 	}
-	return parse_super(ctx);
+	return parse_power(ctx);
 }
 
 static int parse_term(context_t ctx)
 {
-	ast_node_t* firstnode = calloc(1, sizeof(ast_node_t));
+	ast_node_t* firstnode = NEW_NODE();
 	if (!firstnode) return -1;
 	context_t firstctx = ctx;
 	firstctx.node = firstnode;
@@ -184,7 +316,7 @@ static int parse_term(context_t ctx)
 	{
 		token_t* cur = ctx.current + skip;
 		int mult = 0;
-		ast_node_t* factornode = calloc(1, sizeof(ast_node_t));
+		ast_node_t* factornode = NEW_NODE();
 		if (!factornode) return -1;
 
 		int tempskip = 0;
@@ -203,7 +335,7 @@ static int parse_term(context_t ctx)
 			skip += tempskip + 1;
 			mult = cur->data[0] == '*';
 		}
-		else if ((tempskip = parse_super((context_t) {
+		else if ((tempskip = parse_power((context_t) {
 			.current = cur,
 			.node = factornode,
 			.remaining = ctx.remaining - skip
@@ -218,7 +350,7 @@ static int parse_term(context_t ctx)
 			break;
 		}
 
-		ast_node_t* newtempnode = calloc(1, sizeof(ast_node_t));
+		ast_node_t* newtempnode = NEW_NODE();
 		if (!newtempnode) return -1;
 		newtempnode->type = mult ? NODE_MULTIPLY : NODE_DIVIDE;
 		newtempnode->left = tempnode;
@@ -233,7 +365,7 @@ static int parse_term(context_t ctx)
 
 static int parse_expression(context_t ctx)
 {
-	ast_node_t* firstnode = calloc(1, sizeof(ast_node_t));
+	ast_node_t* firstnode = NEW_NODE();
 	if (!firstnode) return -1;
 	context_t firstctx = ctx;
 	firstctx.node = firstnode;
@@ -253,7 +385,7 @@ static int parse_expression(context_t ctx)
 	{
 		token_t* cur = ctx.current + skip;
 		int add = 0;
-		ast_node_t* termnode = calloc(1, sizeof(ast_node_t));
+		ast_node_t* termnode = NEW_NODE();
 		if (!termnode) return -1;
 
 		if (cur->type == TOKEN_OPERATION && (cur->data[0] == '+' || cur->data[0] == '-'))
@@ -276,7 +408,7 @@ static int parse_expression(context_t ctx)
 			break;
 		}
 
-		ast_node_t* newtempnode = calloc(1, sizeof(ast_node_t));
+		ast_node_t* newtempnode = NEW_NODE();
 		if (!newtempnode) return -1;
 		newtempnode->type = add ? NODE_ADD : NODE_SUBTRACT;
 		newtempnode->left = tempnode;
@@ -289,64 +421,92 @@ static int parse_expression(context_t ctx)
 	return skip;
 }
 
-static int parse_function(context_t ctx)
+static int parse_func_decl(context_t ctx)
 {
-	if (ctx.current[0].type != TOKEN_LITERAL) return 0;
-	if (ctx.remaining < 1 || ctx.current[1].type == TOKEN_OPERATION) return ERROR_PARSER_EXPECTED_ARGUMENT;
+	int identskip = parse_identifier(ctx);
+	if (identskip <= 0) return identskip;
 
-	ctx.node->type = NODE_FUNCCALL;
-	ctx.node->funcidx = ctx.current->data[0];
+	int skip = identskip;
+	if (ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].data[0] == '(')
+	{
+		skip++;
 
-	ast_node_t* argnode = calloc(1, sizeof(ast_node_t));
-	context_t primctx = { .current = ctx.current + 1, .remaining = ctx.remaining - 1, .node = argnode };
-	int skip = parse_primary(primctx);
-	if (skip <= 0)
-	{
-		annihilate_tree(argnode);
-		return skip;
+		ast_node_t* paramsnode = NEW_NODE();
+		if (!paramsnode) return -1;
+		context_t paramsctx = { .current = ctx.current + skip, .remaining = ctx.remaining - skip, .node = paramsnode };
+		
+		int paramsskip = parse_func_params(paramsctx);
+		if (paramsskip < 0)
+		{
+			annihilate_tree(paramsnode);
+			return paramsskip;
+		}
+		else if (paramsskip == 0) return 0;
+
+		skip += paramsskip;
+
+		if (ctx.current[skip].type != TOKEN_BRACKET || ctx.current[skip].data[0] != ')')
+		{
+			annihilate_tree(paramsnode);
+			return ERROR_PARSER_UNCLOSED_BRACKET;
+		}
+		skip++;
+
+		ctx.node->type = NODE_FUNC_CALL;
+		ctx.node->left = paramsnode;
 	}
-	else
-	{
-		ctx.node->left = argnode;
-		return skip + 1;
-	}
+	else return 0;
+
+	return skip;
 }
-
 static int parse_statement(context_t ctx)
 {
-	ast_node_t* varnode = calloc(1, sizeof(ast_node_t));
-	if (!varnode) return -1;
-	context_t varctx = ctx;
-	varctx.node = varnode;
+	ast_node_t* defnode = NEW_NODE();
+	if (!defnode) return -1;
+	context_t defctx = ctx;
+	defctx.node = defnode;
 
-	int varskip = parse_variable(varctx);
-	int skip = varskip;
+	int skip = parse_func_decl(defctx);
+	if (skip <= 0)
+		skip = parse_variable(defctx);
 
-	if (varskip > 0 && ctx.current[varskip].type == TOKEN_EQUAL)
+	if (skip < 0)
 	{
-		ast_node_t* exprnode = calloc(1, sizeof(ast_node_t));
-		if (!exprnode) return -1;
-		context_t exprctx = { .current = ctx.current + varskip + 1, .remaining = ctx.remaining - varskip - 1, .node = exprnode };
+		annihilate_tree(defnode);
+		return skip;
+	}
+
+	if (skip > 0 && ctx.current[skip].type == TOKEN_EQUAL)
+	{
+		skip++;
+
+		ast_node_t* exprnode = NEW_NODE();
+		if (!exprnode)
+		{
+			annihilate_tree(defnode);
+			return -1;
+		}
+
+		context_t exprctx = { .current = ctx.current + skip, .remaining = ctx.remaining - skip, .node = exprnode };
 		int exprskip = parse_expression(exprctx);
 		if (exprskip <= 0)
 		{
-			annihilate_tree(varnode);
+			annihilate_tree(defnode);
 			annihilate_tree(exprnode);
-			return exprskip;
+			return exprskip ? exprskip : ERROR_PARSER_EXPECTED_DEFINITION;
 		}
-		skip += exprskip + 1;
+
+		skip += exprskip;
 
 		ctx.node->type = NODE_ASSIGNMENT;
-		ctx.node->left = varnode;
+		ctx.node->left = defnode;
 		ctx.node->right = exprnode;
-	}
-	else
-	{
-		annihilate_tree(varnode);
-		return parse_expression(ctx);
+
+		return skip;
 	}
 
-	return skip;
+	annihilate_tree(defnode);
+	return parse_expression(ctx);
 }
 
 int parse_content(const token_t* tokens, int count, ast_node_t* root)
@@ -355,21 +515,29 @@ int parse_content(const token_t* tokens, int count, ast_node_t* root)
 }
 
 
-/*
-static void debug_print_tree(ast_node_t* node, int indent)
+/*static void debug_print_tree(ast_node_t* node, int indent)
 {
 	for (int i = 0; i < indent; i++)
 		putchar('\t');
 	
 	switch (node->type)
 	{
+	case NODE_ASSIGNMENT:
+		debug_print_tree(node->left, indent);
+		printf("=");
+		debug_print_tree(node->right, indent + 1);
+		break;
 	case NODE_NUMBER:
-		printf("[NUM]: %.6f\n", node->number); break;
+		printf("[NUM]: %.f\n", node->number); break;
 	case NODE_VARIABLE:
-		if (node->variable.ident != -1)
-			printf("[VAR]: %c%d\n", node->variable.sym, node->variable.ident);
-		else
-			printf("[VAR]: %c\n", node->variable.sym);
+		if (node->ident.type == IDENTIFIER_SYMBOLIC)
+			printf("[VAR]: %c", node->ident.sym);
+		else if (node->ident.type == IDENTIFIER_LITERAL)
+			printf("[VAR]: %s", get_literal(node->ident.litid).name);
+
+		if (node->ident.subscript != -1)
+			printf("%d\n", node->ident.subscript);
+		else putchar('\n');
 		break;
 	case NODE_UNARY_MINUS:
 		printf("[-]:\n");
@@ -400,20 +568,31 @@ static void debug_print_tree(ast_node_t* node, int indent)
 		debug_print_tree(node->left, indent + 1);
 		debug_print_tree(node->right, indent + 1);
 		break;
-	case NODE_FUNCCALL:
-		printf("<%s>:\n", get_literal(node->funcidx).name);
+	case NODE_ABS:
+		printf("||:\n");
 		debug_print_tree(node->left, indent + 1);
 		break;
-	case NODE_CONST:
-		printf("[C]: %s\n", get_literal(node->variable.ident).name);
+	case NODE_FUNC_CALL:
+		if (node->ident.type == IDENTIFIER_SYMBOLIC)
+			printf("<%c", node->ident.sym);
+		else if (node->ident.type == IDENTIFIER_LITERAL)
+			printf("<%s", get_literal(node->ident.litid).name);
+
+		if (node->ident.subscript != -1)
+			printf("%d>:\n", node->ident.subscript);
+		else printf(">:\n");
+
+		debug_print_tree(node->left, indent + 1);
 		break;
-	case NODE_ASSIGNMENT:
-		if (node->left->variable.ident != -1)
-			printf("[VAR]: %c%d = \n", node->left->variable.sym, node->left->variable.ident);
+	case NODE_FUNC_PARAM_JOINT:
+		printf("{J}:\n");
+		debug_print_tree(node->left, indent + 1);
+		if (node->right) debug_print_tree(node->right, indent + 1);
 		else
-			printf("[VAR]: %c = \n", node->left->variable.sym);
-		debug_print_tree(node->right, indent);
+		{
+			for (int i = 0; i < indent; i++) putchar('\t');
+			printf("{END}\n");
+		}
 		break;
 	}
-}
-*/
+}*/

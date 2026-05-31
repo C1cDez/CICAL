@@ -21,10 +21,11 @@ static void printerr(int code)
 	case ERROR_PARSER_EXPECTED_NUMBER_AFTER_DOT: printf("Expected number in form N.N.\n"); break;
 	case ERROR_PARSER_UNCLOSED_BRACKET: printf("Unclosed bracket found.\n"); break;
 	case ERROR_PARSER_EXPECTED_ARGUMENT: printf("Function expected an argument.\n"); break;
-	case ERROR_COMPUTE_UNDEFINED_VARIABLE: printf("Unresolved variable.\n"); break;
-	case ERROR_COMPUTE_DIVISION_BY_ZERO: printf("Division by zero.\n"); break;
+	case ERROR_PARSER_EXPECTED_DEFINITION: printf("Declaration expected a definition.\n"); break;
+	case ERROR_COMPUTE_UNDEFINED_VARIABLE: printf("Undefined variable.\n"); break;
+	case ERROR_COMPUTE_UNEXPECTED_NAN: printf("Unexpected NaN.\n"); break;
 	case ERROR_COMPUTE_UNDEFINED_OPERATION: printf("Undefined operation.\n"); break;
-	case ERROR_COMPUTE_ILLEGAL_DOMAIN: printf("Illegal function domain.\n"); break;
+	case ERROR_COMPUTE_UNDEFINED_FUNCTION: printf("Undefined function.\n"); break;
 	case -1: printf("somthing went wrong.\n"); break;
 	default: printf("[UNDEFINED]\n");
 	}
@@ -64,9 +65,9 @@ end:
 }
 
 
-
 int main()
 {
+	preload_defaults();
 	printf("Welcome to CICAL (C Interpretable Calculator)\n" SILENT_PRINT "Use !h for help\n" NORMAL_PRINT);
 
 	char line[128] = { 0 };

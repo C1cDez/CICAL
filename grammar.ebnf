@@ -1,16 +1,22 @@
 (* digits = !TOKEN_NUMBER! *)
 (* alpha = !TOKEN_ALPHA! *)
 (* literal = !TOKEN_LITERAL! *)
-
+(* literal-const = "pi" | "e" | "gamma" | ... *)
+(* std-ufl = unary functional literal *)
 
 number = digits , [ "." , digits ] ;
-variable = alpha , [ digits ] | literal-const ;
+
+identifier = ( alpha | literal-const ) , [ digits ] ;
+variable = identifier ;
+
+function = std-ufl , primary | identifier , "(" , func-params , ")" ;
+func-params = expression , { "," , expression } ;
+func-decl = identifier , "(" , func-params , ")" ;
 
 expression = term , { ("+" | "-") , term } ;
-term = factor , { ("*" | "/") , factor | super } ;
-factor = [ "-" ] , super ;
-super = primary, [ "^" , factor ] ;
-primary = number | variable | function | "(" , expression, ")" ;
-function = literal , primary ;
+term = factor , { ("*" | "/") , factor | power } ;
+factor = [ "-" ] , power ;
+power = primary , [ "^" , factor ] ;
+primary = number | function | variable | "(" , expression, ")" | "|" , expression , "|" ;
 
-statement = [ variable , "=" ] , expression ;
+statement = [ ( func-decl | variable ) , "=" ] , expression ;
