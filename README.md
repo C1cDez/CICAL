@@ -9,25 +9,28 @@ and dynamic variable reassignment.
 ### Interpreting pipeline:
 
 ```
-    "INPUT LINE"
-         |
-         V
-    +---------+     Produces stream of tokens,
-    |  LEXER  |     objects parser can easily work with,
-    +---------+     from given string.
-         |
-         V
-    +----------+    Analyzes given stream of tokens
-    |  PARSER  |    and constructs Abstract Syntax Tree
-    +----------+    to represent hierarchical structure
-         |
-         V
-    +----------+    Recursively goes through AST,
-    | COMPUTER |    computes numbers, resolves and
-    +----------+    assigns variables
-         |
-         V
-     (res, err)
+                 "INPUT LINE"
+                      |
+                      V
+                 +---------+     Produces stream of tokens,
+      /------->  |  LEXER  |     objects parser can easily work with,
+      |          +---------+     from given string.
+      |               |
+    -----             V
+   /     \      +----------+     Analyzes given stream of tokens
+  | CORE* | --> |  PARSER  |     and constructs Abstract Syntax Tree
+   \     /      +----------+     to represent hierarchical structure
+    -----             |
+      |               V
+      |          +----------+    Recursively goes through AST,
+      \------->  | COMPUTER |    computes numbers, resolves
+                 +----------+    variables
+                      |
+                      V
+                  (res, err)
+
+     *CORE stores all the variables and functions for current seesion,
+     thus guides lexer, parser, and computer.
 ```
 
 ---

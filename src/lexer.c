@@ -1,13 +1,10 @@
-#include "cical.h"
+#include "lexer.h"
 
-#include <string.h>
 #include <ctype.h>
 
 
 int tokenize_line(const char* line, token_t* tokens, int maxsize)
 {
-	char temp[sizeof(tokens[0].data)] = { 0 };
-
 	int j = 0;
 	int len = (int)strlen(line);
 	for (int i = 0; j < maxsize && i < len; i++)
@@ -15,6 +12,7 @@ int tokenize_line(const char* line, token_t* tokens, int maxsize)
 		char c = line[i];
 		token_t* tok = tokens + j;
 		if (isspace(c)) continue;
+		tok->data = NULL;
 
 		if (c == ',') tok->type = TOKEN_COMMA;
 		else if (c == '.') tok->type = TOKEN_DOT;
@@ -22,60 +20,71 @@ int tokenize_line(const char* line, token_t* tokens, int maxsize)
 		else if (c == '(' || c == ')')
 		{
 			tok->type = TOKEN_BRACKET;
-			tok->data[0] = c;
+			tok->data = c;
 		}
 		else if (c == '_') tok->type = TOKEN_UNDERSCORE;
 		else if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^')
 		{
 			tok->type = TOKEN_OPERATION;
-			tok->data[0] = c;
+			tok->data = c;
 		}
 		else if (c == '=') tok->type = TOKEN_EQUAL;
 		else if (isdigit(c))
 		{
-			int k = 0;
-			while (isdigit(line[i]) && i < len && k < TOKEN_DATA_SIZE)
-			{
-				tok->data[k] = line[i];
-				i++; k++;
-			}
-			i--;
-			tok->type = TOKEN_NUMBER;
+			tok->type = TOKEN_DIGITS;
+			
+			int len = (int)strspn(line + i, "0123456789");
+			tok->data = calloc(1, len + 1);
+			if (!tok->data) PANIC("Unexpected unallocation");
+			memcpy(tok->data, line + i, len);
+			i += len - 1;
 		}
 		else if (isalpha(c))
 		{
-			int k = 0;
-			while (isalpha(line[i]) && k < TOKEN_DATA_SIZE && i < len)
+			sfunc_t* sfunc = get_sfunc(line + i);
+			lfunc_t* lfunc = get_lfunc(line + i);
+			if (sfunc)
 			{
-				temp[k] = line[i];
-				k++; i++;
+				tok->type = TOKEN_SFUNC;
+				tok->data = sfunc;
+				i += (int)strlen(sfunc->name) - 1;
 			}
-			i--;
-
-			for (int m = 0; m < k && j < maxsize; j++)
+			else if (lfunc)
 			{
-				token_t* t = tokens + j;
-				int f = find_literal(temp + m);
-				if (f != -1)
+				tok->type = TOKEN_LFUNC;
+				tok->data = lfunc;
+				i += (int)strlen(lfunc->name) - 1;
+			}
+			else
+			{
+				alpha_name_t* an = get_alpha_name(line + i);
+				if (an)
 				{
-					t->type = TOKEN_LITERAL;
-					t->data[0] = f;
-					m += (int)strlen(get_literal(f).name);
+					tok->type = TOKEN_ALPHA;
+					tok->data = an;
+					i += (int)strlen(an->str) - 1;
 				}
 				else
 				{
-					t->type = TOKEN_ALPHA;
-					t->data[0] = temp[m];
-					m++;
+					tok->type = TOKEN_SYMBOL;
+					tok->data = c;
 				}
 			}
-			j--;
-
-			memset(temp, 0, sizeof(temp));
 		}
 		else return ERROR_LEXER_UNDEFINED_SYMBOL;
 
 		j++;
 	}
+
+	if (j == maxsize) PANIC("Unexpected end of buffer of lexer");
+	tokens[j++].type = TOKEN_EOL;
 	return j;
+}
+void cleanup_tokens(token_t* tokens, int count)
+{
+	for (int i = 0; i < count; i++)
+	{
+		if (tokens[i].type == TOKEN_DIGITS && tokens[i].data)
+			free(tokens[i].data);
+	}
 }

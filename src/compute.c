@@ -1,189 +1,216 @@
-#include "cical.h"
+#include "compute.h"
+#include "parser.h"
+#include "lexer.h"
 
-#include <string.h>
-#include <math.h>
-#include <stdlib.h>
-#include <stdio.h>
-
-
-// LITERALS
-
-static const literal_t LITERALS[] = {
-	// consts 0 - 7
-	{ "pi", LITERAL_CONST },
-	{ "e", LITERAL_CONST },
-	{ "tau", LITERAL_CONST },
-	{ "phi", LITERAL_CONST },
-	{ "gamma", LITERAL_CONST },
-	{ "rho", LITERAL_CONST },
-	{ "alpha", LITERAL_CONST },
-	{ "beta", LITERAL_CONST },
-
-	// basic 8 - 13
-	{ "sqrt", LITERAL_FUNCTION, 1 },
-	{ "cbrt", LITERAL_FUNCTION, 1 },
-	{ "nrt", LITERAL_FUNCTION, 2 },
-	{ "log", LITERAL_FUNCTION, 2 },
-	{ "ln", LITERAL_FUNCTION, 1 },
-	{ "exp", LITERAL_FUNCTION, 1 },
-
-	// trigonometry 14 - 22
-	{ "sin", LITERAL_FUNCTION, 1 },
-	{ "cos", LITERAL_FUNCTION, 1 },
-	{ "tan", LITERAL_FUNCTION, 1 },
-	{ "cot", LITERAL_FUNCTION, 1 },
-	{ "sinh", LITERAL_FUNCTION, 1 },
-	{ "cosh", LITERAL_FUNCTION, 1 },
-	{ "tanh", LITERAL_FUNCTION, 1 },
-	{ "coth", LITERAL_FUNCTION, 1 },
-
-	{ "max", LITERAL_FUNCTION, -1 },
-	{ "min", LITERAL_FUNCTION, -1 }
-};
-
-literal_t get_literal(int idx)
+static void collapse_env(varenv_t* env)
 {
-	return LITERALS[idx];
+	if (!env) return;
+	if (env->next) collapse_env(env->next);
+	free(env);
 }
 
-int find_literal(const char* str)
+#define COMRES_V(v) (compresult_t){ v, 0 }
+#define COMRES_E(e) (compresult_t){ 0.0, e }
+
+static compresult_t compute_variable(const ast_node_t* node, const varenv_t* env);
+static compresult_t compute_dfunction(const ast_node_t* node, const varenv_t* env);
+
+compresult_t compute_node(const struct ast_node* node, const varenv_t* env)
 {
-	for (int i = 0; i < __crt_countof(LITERALS); i++)
-	{
-		if (!strncmp(str, LITERALS[i].name, strlen(LITERALS[i].name))) return i;
-	}
-	return -1;
-}
+	if (!node) return COMRES_E(ERROR_COMPUTE_UNEXPECTED_NAN);
 
-
-int does_function_exist(identifier_t id)
-{
-	return 0;
-}
-
-// VARIABLES
-
-#define VARSET_SIZE 1024
-struct
-{
-	identifier_t var;
-	ast_node_t* value;
-} VARSET[VARSET_SIZE] = { 0 };
-
-static ast_node_t* lookfor_variable(identifier_t id)
-{
-	for (int i = 0; i < VARSET_SIZE; i++)
-	{
-		identifier_t v = VARSET[i].var;
-		if (v.type == id.type && v.sym == id.sym && v.litid == id.litid && v.subscript == id.subscript)
-			return VARSET[i].value;
-	}
-	return NULL;
-}
-static void insert_variable(identifier_t id, const ast_node_t* node)
-{
-	int i = 0;
-	for (; i < VARSET_SIZE; i++)
-	{
-		identifier_t v = VARSET[i].var;
-		if (
-			(v.type == id.type && v.sym == id.sym && v.litid == id.litid && v.subscript == id.subscript) ||
-			(v.type == 0)
-		) break;
-	}
-
-	if (VARSET[i].value) annihilate_tree(VARSET[i].value);
-	VARSET[i].var = id;
-	VARSET[i].value = node;
-}
-
-
-// COMPUTATION
-
-#define COMRES(v, e) (compresult_t) { .value = v, .error = e }
-#define COMRES_V(v) COMRES(v, 0)
-#define COMRES_E(e) COMRES(0.0, e)
-
-static compresult_t compute_node(const ast_node_t* node);
-static compresult_t compute_function(const ast_node_t* funcnode);
-
-
-static compresult_t compute_function(const ast_node_t* funcnode)
-{
-	return COMRES_E(-1);
-}
-static compresult_t compute_node(const ast_node_t* node)
-{
 	if (node->type == NODE_NUMBER)
 		return COMRES_V(node->number);
 	else if (node->type == NODE_VARIABLE)
-	{
-		ast_node_t* v = lookfor_variable(node->ident);
-		if (v) return compute_node(v);
-		else return COMRES_E(ERROR_COMPUTE_UNDEFINED_VARIABLE);
-	}
+		return compute_variable(node, env);
+	else if (node->type == NODE_LFUNCTION)
+		return node->lfunc->logic(node->left, env);
+	else if (node->type == NODE_DFUNCTION)
+		return compute_dfunction(node, env);
 
-	compresult_t lr = COMRES_E(-1);
-	if (node->left) lr = compute_node(node->left);
-	if (lr.error) return COMRES_E(lr.error);
-	if (isnan(lr.value)) return COMRES_E(ERROR_COMPUTE_UNEXPECTED_NAN);
+	compresult_t lres = COMRES_E(-1);
+	if (node->left) lres = compute_node(node->left, env);
+	if (lres.error) return COMRES_E(lres.error);
+	if (isnan(lres.value)) return COMRES_E(ERROR_COMPUTE_UNEXPECTED_NAN);
 
-	if (node->type == NODE_UNARY_MINUS)
-		return COMRES_V(-lr.value);
+	if (node->type == NODE_NEGATE)
+		return COMRES_V(-lres.value);
 	else if (node->type == NODE_ABS)
-		return COMRES_V(lr.value < 0 ? -lr.value : lr.value);
-	else if (node->type == NODE_FUNC_CALL)
-		return compute_function(node);
-
-	compresult_t rr = COMRES_E(-1);
-	if (node->right) rr = compute_node(node->right);
-	if (rr.error) return COMRES_E(rr.error);
-	if (isnan(rr.value)) return COMRES_E(ERROR_COMPUTE_UNEXPECTED_NAN);
+		return COMRES_V(fabs(lres.value));
+	else if (node->type == NODE_SFUNCTION)
+		return COMRES_V(node->sfunc->logic(lres.value));
+	
+	compresult_t rres = COMRES_E(-1);
+	if (node->right) rres = compute_node(node->right, env);
+	if (rres.error) return COMRES_E(rres.error);
+	if (isnan(rres.value)) return COMRES_E(ERROR_COMPUTE_UNEXPECTED_NAN);
 
 	if (node->type == NODE_POW)
-		return COMRES_V(pow(lr.value, rr.value));
+		return COMRES_V(pow(lres.value, rres.value));
 	else if (node->type == NODE_MULTIPLY)
-		return COMRES_V(lr.value * rr.value);
+		return COMRES_V(lres.value * rres.value);
 	else if (node->type == NODE_DIVIDE)
-		return COMRES_V(lr.value / rr.value);
+		return COMRES_V(lres.value / rres.value);
 	else if (node->type == NODE_ADD)
-		return COMRES_V(lr.value + rr.value);
+		return COMRES_V(lres.value + rres.value);
 	else if (node->type == NODE_SUBTRACT)
-		return COMRES_V(lr.value - rr.value);
+		return COMRES_V(lres.value - rres.value);
+
+	collapse_env(env);
+	return COMRES_E(ERROR_COMPUTE_UNDEFINED_OPERATION);
 }
 
-int execute_sequence(const ast_node_t* node, compresult_t* cr)
+/* helpers */
+static compresult_t compute_variable(const ast_node_t* node, const varenv_t* env)
 {
-	if (node->type == NODE_ASSIGNMENT)
+	while (env)
 	{
-		ast_node_t* var = node->left, * expr = node->right;
-		if (!var || !expr) return 1;
-		insert_variable(var->ident, expr);
-		return 0;
+		if (ident_eq(env->variable, node->ident)) return env->result;
+		env = env->next;
 	}
-	else
+	const ast_node_t* v = get_variable(node->ident);
+	return v ? compute_node(v, env) : COMRES_E(ERROR_COMPUTE_UNDEFINED_VARIABLE);
+}
+static compresult_t compute_dfunction(const ast_node_t* node, const varenv_t* oldenv)
+{
+	dfunc_t* dfunc = get_dfunc(node->ident);
+	if (!dfunc) return COMRES_E(ERROR_COMPUTE_UNDEFINED_FUNCTION);
+
+	varenv_t* env = NULL;
+	const ast_node_t* args = node->left;
+	const ast_node_t* pattern = dfunc->args;
+	while (pattern)
 	{
-		*cr = compute_node(node);
-		return 1;
+		if (!args)
+		{
+			collapse_env(env);
+			return COMRES_E(ERROR_COMPUTE_TOO_FEW_ARGUMENTS);
+		}
+
+		varenv_t* newenv = calloc(1, sizeof(varenv_t));
+		if (!newenv) PANIC("Undefined unallocation");
+
+		newenv->variable = pattern->left->ident;
+		newenv->result = compute_node(args->left, oldenv);
+		newenv->next = env;
+		env = newenv;
+
+		if (newenv->result.error)
+		{
+			collapse_env(env);
+			return newenv->result;
+		}
+
+		pattern = pattern->right;
+		args = args->right;
 	}
+
+	return compute_node(dfunc->impl, env);
 }
 
+/* S-function implementation */
+double sign(double x) { return x > 0 ? 1 : (x == 0 ? 0 : -1); }
+double cot(double x) { return cos(x) / sin(x); }
+double coth(double x) { return cosh(x) / sinh(x); }
+double acot(double x) { return 1.570796326794896557998981734 - atan(x); }
+double acoth(double x) { return atanh(1.0 / x); }
 
-// DEFAULTS
-
-static int preload_const(int idx, double value, int litid, int subscript)
+/* L-function implementation */
+compresult_t llog(const struct ast_node* node, struct varenv* env)
 {
-	ast_node_t* cnst = calloc(1, sizeof(ast_node_t));
-	if (!cnst) return 1;
-	cnst->type = NODE_NUMBER;
-	cnst->number = value;
-	VARSET[idx].var = (identifier_t){ .type = IDENTIFIER_LITERAL, .litid = litid, .subscript = subscript };
-	VARSET[idx].value = cnst;
+	compresult_t base = compute_node(node->left, env);
+	if (!node->right) return COMRES_E(ERROR_COMPUTE_TOO_FEW_ARGUMENTS);
+	compresult_t value = compute_node(node->right->left, env);
+	if (base.error) return COMRES_E(base.error);
+	if (value.error) return COMRES_E(value.error);
+
+	double res = log(value.value) / log(base.value);
+	if (isnan(res)) return COMRES_E(ERROR_COMPUTE_UNEXPECTED_NAN);
+	else return COMRES_V(res);
 }
-void preload_defaults()
+compresult_t lmax(const struct ast_node* node, struct varenv* env)
 {
-	preload_const(0, 3.141592653589793238462643383279, 0, -1); // pi
-	preload_const(1, 2.718281828459045235360287471352, 1, -1); // e
-	preload_const(2, 1.618033988749894902525738871191, 3, -1); // phi
-	preload_const(3, 0.577215664901532860606512090082, 4, -1); // gamma
+	double maximum = -INFINITY;
+	while (node)
+	{
+		compresult_t cr = compute_node(node->left, env);
+		if (cr.error) return COMRES_E(cr.error);
+		else
+		{
+			if (cr.value > maximum) maximum = cr.value;
+		}
+		node = node->right;
+	}
+	return COMRES_V(maximum);
+}
+compresult_t lmin(const struct ast_node* node, struct varenv* env)
+{
+	double minimum = INFINITY;
+	while (node)
+	{
+		compresult_t cr = compute_node(node->left, env);
+		if (cr.error) return COMRES_E(cr.error);
+		else
+		{
+			if (cr.value < minimum) minimum = cr.value;
+		}
+		node = node->right;
+	}
+	return COMRES_V(minimum);
+}
+static long long gcd(long long a, long long b)
+{
+	while (b != 0) {
+		long long t = a % b;
+		a = b;
+		b = t;
+	}
+	return a;
+}
+compresult_t lgcd(const struct ast_node* node, struct varenv* env)
+{
+	long long g = 0;
+	while (node)
+	{
+		compresult_t cr = compute_node(node->left, env);
+		if (cr.error) return COMRES_E(cr.error);
+		else
+		{
+			long long v = (long long)floor(cr.value);
+			g = gcd(g, v);
+		}
+		node = node->right;
+	}
+	return COMRES_V((double)g);
+}
+static long long lcm(long long a, long long b)
+{
+	return a * b / gcd(a, b);
+}
+compresult_t llcm(const struct ast_node* node, struct varenv* env)
+{
+	long long g = 1;
+	while (node)
+	{
+		compresult_t cr = compute_node(node->left, env);
+		if (cr.error) return COMRES_E(cr.error);
+		else
+		{
+			long long v = (long long)floor(cr.value);
+			g = lcm(g, v);
+		}
+		node = node->right;
+	}
+	return COMRES_V((double)g);
+}
+compresult_t lmod(const struct ast_node* node, struct varenv* env)
+{
+	compresult_t dividend = compute_node(node->left, env);
+	if (!node->right) return COMRES_E(ERROR_COMPUTE_TOO_FEW_ARGUMENTS);
+	compresult_t divisor = compute_node(node->right->left, env);
+	if (dividend.error) return COMRES_E(dividend.error);
+	if (divisor.error) return COMRES_E(divisor.error);
+
+	long long rem = (long long)floor(dividend.value) % (long long)floor(divisor.value);
+	return COMRES_V((double)rem);
 }
