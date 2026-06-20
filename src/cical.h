@@ -87,3 +87,4 @@ int remove_dfuncs();
 int execute(const struct ast_node* root, struct compresult* cr);
 void preload_defaults();
 void annihilate_tree(const struct ast_node* node);
+void show_core(char c);

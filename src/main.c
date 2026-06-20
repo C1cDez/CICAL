@@ -118,8 +118,9 @@ int main()
 					"!q - Quit\n"
 					"!c - Clear screen\n"
 					"!p - Set output precision\n"
-					"!u[f|v] - Un-define functions, variables\n"
-					"!l[f|c] - List standard functions, constants\n"
+					"!u[v|f] - Un-define functions and variables\n"
+					"!l[c|f] - List standard functions and constants\n"
+					"!s[v|f] - Show defined functions and variables\n"
 					NORMAL_PRINT
 				);
 			}
@@ -144,6 +145,13 @@ int main()
 					printf(SILENT_PRINT "Removed %d functions\n" NORMAL_PRINT, remove_dfuncs());
 			}
 			else if (command[0] == 'l') list_standrard(command[1]);
+			else if (command[0] == 's')
+			{
+				printf(SILENT_PRINT);
+				show_core(command[1]);
+				printf(NORMAL_PRINT);
+			}
+			else printf(RED_PRINT "Undefined control command\n" NORMAL_PRINT);
 		}
 		else if (line[0] == '/' || line[0] == 0) {}
 		else handle_line(line);

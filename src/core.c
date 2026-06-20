@@ -105,21 +105,6 @@ static void declare_lfuncs()
 }
 
 
-/* --------------------- MISC --------------------- */
-
-int ident_eq(identifier_t a, identifier_t b)
-{
-	return a.type == b.type && a.alpha == b.alpha && a.symbol == b.symbol && a.subscript == b.subscript;
-}
-void annihilate_tree(const struct ast_node* node)
-{
-	if (!node) return;
-	if (node->left) annihilate_tree(node->left);
-	if (node->right) annihilate_tree(node->right);
-	free(node);
-}
-
-
 /* --------------------- VARIABLES --------------------- */
 
 static struct
@@ -217,6 +202,81 @@ int remove_dfuncs()
 		FUNCSET[i].impl = NULL;
 	}
 	return count;
+}
+
+
+/* --------------------- MISC --------------------- */
+
+int ident_eq(identifier_t a, identifier_t b)
+{
+	return a.type == b.type && a.alpha == b.alpha && a.symbol == b.symbol && a.subscript == b.subscript;
+}
+void annihilate_tree(const struct ast_node* node)
+{
+	if (!node) return;
+	if (node->left) annihilate_tree(node->left);
+	if (node->right) annihilate_tree(node->right);
+	free(node);
+}
+static void print_identifier(identifier_t i)
+{
+	if (i.type == IDENTIFIER_SYMBOL)
+	{
+		if (i.subscript == -1)
+			printf("%c", i.symbol);
+		else
+			printf("%c%d", i.symbol, i.subscript);
+	}
+	else if (i.type == IDENTIFIER_ALPHA)
+	{
+		if (i.subscript == -1)
+			printf("%s", i.alpha->str);
+		else
+			printf("%s%d", i.alpha->str, i.subscript);
+	}
+}
+void show_core(char c)
+{
+	if (c == 0 || c == 'v')
+	{
+		printf("Variables: ");
+		int total = 0;
+		for (int i = 0; i < countof(VARSET); i++)
+		{
+			if (VARSET[i].mut && VARSET[i].ident.type)
+			{
+				print_identifier(VARSET[i].ident);
+				printf(", ");
+				total++;
+			}
+		}
+		if (total == 0) printf("none");
+		putchar('\n');
+	}
+	if (c == 0 || c == 'f')
+	{
+		printf("Functions: ");
+		int total = 0;
+		for (int i = 0; i < countof(FUNCSET); i++)
+		{
+			if (!FUNCSET[i].ident.type) continue;
+
+			print_identifier(FUNCSET[i].ident);
+			putchar('(');
+			ast_node_t* arg = FUNCSET[i].args;
+			while (arg->right)
+			{
+				print_identifier(arg->left->ident);
+				printf(", ");
+				arg = arg->right;
+			}
+			print_identifier(arg->left->ident);
+			printf("); ");
+			total++;
+		}
+		if (total == 0) printf("none");
+		putchar('\n');
+	}
 }
 
 
