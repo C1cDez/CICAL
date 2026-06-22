@@ -28,7 +28,6 @@ static void printerr(int code)
 	case ERROR_PARSER_EXPECTED_DEFINITION: printf("Expected definition.\n"); break;
 	case ERROR_PARSER_NOT_FINISHED_STATEMENT: printf("Not finished statement.\n"); break;
 	case ERROR_COMPUTE_UNDEFINED_VARIABLE: printf("Undefined variable.\n"); break;
-	case ERROR_COMPUTE_UNEXPECTED_NAN: printf("Unexpected NaN.\n"); break;
 	case ERROR_COMPUTE_UNDEFINED_OPERATION: printf("Undefined operation.\n"); break;
 	case ERROR_COMPUTE_UNDEFINED_FUNCTION: printf("Undefined function.\n"); break;
 	case ERROR_COMPUTE_TOO_FEW_ARGUMENTS: printf("Too few arguments for function.\n"); break;

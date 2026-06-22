@@ -20,55 +20,53 @@ int tokenize_line(const char* line, token_t* tokens, int maxsize)
 		else if (c == '(' || c == ')')
 		{
 			tok->type = TOKEN_BRACKET;
-			tok->data = c;
+			tok->data = (void*)c;
 		}
 		else if (c == '_') tok->type = TOKEN_UNDERSCORE;
 		else if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^')
 		{
 			tok->type = TOKEN_OPERATION;
-			tok->data = c;
+			tok->data = (void*)c;
 		}
 		else if (c == '=') tok->type = TOKEN_EQUAL;
 		else if (isdigit(c))
 		{
 			tok->type = TOKEN_DIGITS;
 			
-			int len = (int)strspn(line + i, "0123456789");
-			tok->data = calloc(1, len + 1);
+			int dlen = (int)strspn(line + i, "0123456789");
+			tok->data = calloc(1, dlen + 1);
 			if (!tok->data) PANIC("Unexpected unallocation");
-			memcpy(tok->data, line + i, len);
-			i += len - 1;
+			memcpy(tok->data, line + i, dlen);
+			i += dlen - 1;
 		}
 		else if (isalpha(c))
 		{
-			sfunc_t* sfunc = get_sfunc(line + i);
-			lfunc_t* lfunc = get_lfunc(line + i);
+			const sfunc_t* sfunc = get_sfunc(line + i);
+			const lfunc_t* lfunc = get_lfunc(line + i);
+			const alpha_name_t* an = get_alpha_name(line + i);
+
 			if (sfunc)
 			{
 				tok->type = TOKEN_SFUNC;
-				tok->data = sfunc;
+				tok->data = (void*)sfunc;
 				i += (int)strlen(sfunc->name) - 1;
 			}
 			else if (lfunc)
 			{
 				tok->type = TOKEN_LFUNC;
-				tok->data = lfunc;
+				tok->data = (void*)lfunc;
 				i += (int)strlen(lfunc->name) - 1;
+			}
+			else if (an)
+			{
+				tok->type = TOKEN_ALPHA;
+				tok->data = (void*)an;
+				i += (int)strlen(an->str) - 1;
 			}
 			else
 			{
-				alpha_name_t* an = get_alpha_name(line + i);
-				if (an)
-				{
-					tok->type = TOKEN_ALPHA;
-					tok->data = an;
-					i += (int)strlen(an->str) - 1;
-				}
-				else
-				{
-					tok->type = TOKEN_SYMBOL;
-					tok->data = c;
-				}
+				tok->type = TOKEN_SYMBOL;
+				tok->data = (void*)c;
 			}
 		}
 		else return ERROR_LEXER_UNDEFINED_SYMBOL;

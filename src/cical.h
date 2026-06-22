@@ -18,12 +18,11 @@
 #define ERROR_PARSER_NOT_FINISHED_STATEMENT 0xc1ca1204
 
 #define ERROR_COMPUTE_UNDEFINED_VARIABLE 0xc1ca1300
-#define ERROR_COMPUTE_UNEXPECTED_NAN 0xc1ca1301
-#define ERROR_COMPUTE_UNDEFINED_OPERATION 0xc1ca1302
-#define ERROR_COMPUTE_UNDEFINED_FUNCTION 0xc1ca1303
-#define ERROR_COMPUTE_TOO_FEW_ARGUMENTS 0xc1ca1304
-#define ERROR_COMPUTE_EXPECTED_REGULAR_DECLARATION 0xc1ca1305
-#define ERROR_COMPUTE_EXPECTED_ONLY_VARIABLES 0xc1ca1306
+#define ERROR_COMPUTE_UNDEFINED_OPERATION 0xc1ca1301
+#define ERROR_COMPUTE_UNDEFINED_FUNCTION 0xc1ca1302
+#define ERROR_COMPUTE_TOO_FEW_ARGUMENTS 0xc1ca1303
+#define ERROR_COMPUTE_EXPECTED_REGULAR_DECLARATION 0xc1ca1304
+#define ERROR_COMPUTE_EXPECTED_ONLY_VARIABLES 0xc1ca1305
 
 /* --------------------- CORE --------------------- */
 
@@ -40,7 +39,7 @@ typedef struct
 	union
 	{
 		char symbol;
-		alpha_name_t* alpha;
+		const alpha_name_t* alpha;
 	};
 	enum
 	{
@@ -53,7 +52,7 @@ int ident_eq(identifier_t a, identifier_t b);
 
 /* variables */
 const struct ast_node* get_variable(identifier_t ident);
-int remove_variables();
+int remove_variables(void);
 
 /* functions */
 struct ast_node;
@@ -81,10 +80,10 @@ typedef struct
 	const struct ast_node* impl;
 } dfunc_t;
 const dfunc_t* get_dfunc(identifier_t ident);
-int remove_dfuncs();
+int remove_dfuncs(void);
 
 /* main */
 int execute(const struct ast_node* root, struct compresult* cr);
-void preload_defaults();
+void preload_defaults(void);
 void annihilate_tree(const struct ast_node* node);
 void show_core(char c);

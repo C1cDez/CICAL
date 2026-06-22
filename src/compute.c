@@ -17,7 +17,7 @@ static compresult_t compute_dfunction(const ast_node_t* node, const varenv_t* en
 
 compresult_t compute_node(const struct ast_node* node, const varenv_t* env)
 {
-	if (!node) return COMRES_E(ERROR_COMPUTE_UNEXPECTED_NAN);
+	if (!node) return COMRES_V(NAN);
 
 	if (node->type == NODE_NUMBER)
 		return COMRES_V(node->number);
@@ -31,7 +31,7 @@ compresult_t compute_node(const struct ast_node* node, const varenv_t* env)
 	compresult_t lres = COMRES_E(-1);
 	if (node->left) lres = compute_node(node->left, env);
 	if (lres.error) return COMRES_E(lres.error);
-	if (isnan(lres.value)) return COMRES_E(ERROR_COMPUTE_UNEXPECTED_NAN);
+	if (isnan(lres.value)) return COMRES_V(NAN);
 
 	if (node->type == NODE_NEGATE)
 		return COMRES_V(-lres.value);
@@ -43,7 +43,7 @@ compresult_t compute_node(const struct ast_node* node, const varenv_t* env)
 	compresult_t rres = COMRES_E(-1);
 	if (node->right) rres = compute_node(node->right, env);
 	if (rres.error) return COMRES_E(rres.error);
-	if (isnan(rres.value)) return COMRES_E(ERROR_COMPUTE_UNEXPECTED_NAN);
+	if (isnan(rres.value)) COMRES_V(NAN);
 
 	if (node->type == NODE_POW)
 		return COMRES_V(pow(lres.value, rres.value));
@@ -73,7 +73,7 @@ static compresult_t compute_variable(const ast_node_t* node, const varenv_t* env
 }
 static compresult_t compute_dfunction(const ast_node_t* node, const varenv_t* oldenv)
 {
-	dfunc_t* dfunc = get_dfunc(node->ident);
+	const dfunc_t* dfunc = get_dfunc(node->ident);
 	if (!dfunc) return COMRES_E(ERROR_COMPUTE_UNDEFINED_FUNCTION);
 
 	varenv_t* env = NULL;
@@ -124,9 +124,7 @@ compresult_t llog(const struct ast_node* node, struct varenv* env)
 	if (base.error) return COMRES_E(base.error);
 	if (value.error) return COMRES_E(value.error);
 
-	double res = log(value.value) / log(base.value);
-	if (isnan(res)) return COMRES_E(ERROR_COMPUTE_UNEXPECTED_NAN);
-	else return COMRES_V(res);
+	return COMRES_V(log(value.value) / log(base.value));
 }
 compresult_t lmax(const struct ast_node* node, struct varenv* env)
 {

@@ -8,7 +8,7 @@
 #include "compute.h"
 
 
-#define countof(arr) (sizeof(arr) / sizeof(arr[0]))
+#define countof(arr) (int)(sizeof(arr) / sizeof(arr[0]))
 
 static const alpha_name_t ALPHA_NAMES[] = {
 	{ "alpha" }, { "beta" }, { "gamma" }, { "mu" }, { "pi" }, { "rho" }, { "tau" }, { "phi" }
@@ -45,7 +45,7 @@ const sfunc_t* get_sfunc(const char* str)
 	}
 	return NULL;
 }
-static void declare_sfuncs()
+static void declare_sfuncs(void)
 {
 	SFUNCS[0].logic = sqrt;
 	SFUNCS[1].logic = cbrt;
@@ -94,7 +94,7 @@ const lfunc_t* get_lfunc(const char* str)
 	}
 	return NULL;
 }
-static void declare_lfuncs()
+static void declare_lfuncs(void)
 {
 	LFUNCS[0].logic = llog;
 	LFUNCS[1].logic = lmax;
@@ -137,7 +137,7 @@ const struct ast_node* get_variable(identifier_t ident)
 	}
 	return NULL;
 }
-int remove_variables()
+int remove_variables(void)
 {
 	int count = 0;
 	for (int i = 0; i < countof(VARSET); i++)
@@ -189,7 +189,7 @@ static int insert_new_dfunc(identifier_t ident, const ast_node_t* args, const as
 	FUNCSET[i].impl = impl;
 	return 0;
 }
-int remove_dfuncs()
+int remove_dfuncs(void)
 {
 	int count = 0;
 	for (int i = 0; i < countof(FUNCSET); i++)
@@ -290,7 +290,7 @@ static void preload_consts(identifier_t ident, double value)
 	node->number = value;
 	insert_new_variable(ident, node, 0);
 }
-void preload_defaults()
+void preload_defaults(void)
 {
 	for (int i = 0; i < countof(VARSET); i++) VARSET[i].mut = 1;
 

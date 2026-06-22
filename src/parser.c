@@ -63,7 +63,7 @@ static int parse_identifier(context_t ctx)
 	if (ctx.current[0].type == TOKEN_SYMBOL)
 	{
 		ctx.node->ident.type = IDENTIFIER_SYMBOL;
-		ctx.node->ident.symbol = ctx.current[0].data;
+		ctx.node->ident.symbol = (void*)ctx.current[0].data;
 	}
 	else if (ctx.current[0].type == TOKEN_ALPHA)
 	{
