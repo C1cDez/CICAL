@@ -27,9 +27,9 @@ double acot(double x);
 double acoth(double x);
 
 /* L-functions */
-compresult_t llog(const struct ast_node* node, struct varenv* env);
-compresult_t lmax(const struct ast_node* node, struct varenv* env);
-compresult_t lmin(const struct ast_node* node, struct varenv* env);
-compresult_t lgcd(const struct ast_node* node, struct varenv* env);
-compresult_t llcm(const struct ast_node* node, struct varenv* env);
-compresult_t lmod(const struct ast_node* node, struct varenv* env);
+compresult_t llog(const struct ast_node* node, const struct varenv* env);
+compresult_t lmax(const struct ast_node* node, const struct varenv* env);
+compresult_t lmin(const struct ast_node* node, const struct varenv* env);
+compresult_t lgcd(const struct ast_node* node, const struct varenv* env);
+compresult_t llcm(const struct ast_node* node, const struct varenv* env);
+compresult_t lmod(const struct ast_node* node, const struct varenv* env);

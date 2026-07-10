@@ -1,5 +1,6 @@
 
 number = digits , [ "." , digits ] ;
+prevanswer = at ;
 
 identifier = ( symbol | alpha ) , [ digits ] ;
 variable = identifier ;
@@ -16,7 +17,7 @@ factor = [ "-" ] , super ;
 super = multiple , { multiple } ;
 multiple = primary , [ "^" , power ] ;
 power = [ "-" ] , multiple ;
-primary = number | function | variable | "(" , expression, ")" | "|" , expression , "|" ;
+primary = number | function | variable | prevanswer | "(" , expression, ")" | "|" , expression , "|" ;
 
 definable = variable | identifier , "(" , arguments , ")" ;
 statement = [ definable , "=" ] , expression , $ ;

@@ -33,6 +33,7 @@ static void printerr(int code)
 	case ERROR_COMPUTE_TOO_FEW_ARGUMENTS: printf("Too few arguments for function.\n"); break;
 	case ERROR_COMPUTE_EXPECTED_REGULAR_DECLARATION: printf("Expected variable declaration.\n"); break;
 	case ERROR_COMPUTE_EXPECTED_ONLY_VARIABLES: printf("Expected only variables in function declaration.\n"); break;
+	case ERROR_COMPUTE_NO_PREVIOUS_ANSWER_KNOWN: printf("No previous answer exist.\n"); break;
 	case -1: printf("somthing went wrong.\n"); break;
 	default: printf("[UNDEFINED]\n");
 	}

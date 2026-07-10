@@ -23,6 +23,7 @@
 #define ERROR_COMPUTE_TOO_FEW_ARGUMENTS 0xc1ca1303
 #define ERROR_COMPUTE_EXPECTED_REGULAR_DECLARATION 0xc1ca1304
 #define ERROR_COMPUTE_EXPECTED_ONLY_VARIABLES 0xc1ca1305
+#define ERROR_COMPUTE_NO_PREVIOUS_ANSWER_KNOWN 0xc1ca1306
 
 /* --------------------- CORE --------------------- */
 
@@ -69,7 +70,7 @@ const sfunc_t* get_sfunc(const char* str);
 typedef struct
 {
 	const char* name;
-	struct compresult (*logic)(const struct ast_node* node, struct varenv* env);
+	struct compresult (*logic)(const struct ast_node* node, const struct varenv* env);
 } lfunc_t;
 const lfunc_t* get_lfunc(const char* str);
 
@@ -87,3 +88,4 @@ int execute(const struct ast_node* root, struct compresult* cr);
 void preload_defaults(void);
 void annihilate_tree(const struct ast_node* node);
 void show_core(char c);
+struct compresult get_previous_answer(void);

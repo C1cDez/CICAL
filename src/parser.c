@@ -17,6 +17,7 @@ static context_t subctx(context_t old, int skip, ast_node_t* node)
 }
 
 static int parse_number(context_t ctx);
+static int parse_prevanswer(context_t ctx);
 static int parse_identifier(context_t ctx);
 static int parse_sfunction(context_t ctx);
 static int parse_lfunction(context_t ctx);
@@ -57,6 +58,12 @@ static int parse_number(context_t ctx)
 	}
 
 	return skip;
+}
+static int parse_prevanswer(context_t ctx)
+{
+	if (ctx.current[0].type != TOKEN_AT) return 0;
+	ctx.node->type = NODE_PREVANSWER;
+	return 1;
 }
 static int parse_identifier(context_t ctx)
 {
@@ -232,6 +239,7 @@ static int parse_primary(context_t ctx)
 	if ((skip = parse_number(ctx))) return skip;
 	else if ((skip = parse_function(ctx))) return skip;
 	else if ((skip = parse_variable(ctx))) return skip;
+	else if ((skip = parse_prevanswer(ctx))) return skip;
 	else if (ctx.current[0].type == TOKEN_BRACKET && ctx.current[0].data == '(')
 	{
 		skip++;

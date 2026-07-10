@@ -21,6 +21,8 @@ compresult_t compute_node(const struct ast_node* node, const varenv_t* env)
 
 	if (node->type == NODE_NUMBER)
 		return COMRES_V(node->number);
+	else if (node->type == NODE_PREVANSWER)
+		return get_previous_answer();
 	else if (node->type == NODE_VARIABLE)
 		return compute_variable(node, env);
 	else if (node->type == NODE_LFUNCTION)
@@ -116,7 +118,7 @@ double acot(double x) { return 1.570796326794896557998981734 - atan(x); }
 double acoth(double x) { return atanh(1.0 / x); }
 
 /* L-function implementation */
-compresult_t llog(const struct ast_node* node, struct varenv* env)
+compresult_t llog(const struct ast_node* node, const struct varenv* env)
 {
 	compresult_t base = compute_node(node->left, env);
 	if (!node->right) return COMRES_E(ERROR_COMPUTE_TOO_FEW_ARGUMENTS);
@@ -126,7 +128,7 @@ compresult_t llog(const struct ast_node* node, struct varenv* env)
 
 	return COMRES_V(log(value.value) / log(base.value));
 }
-compresult_t lmax(const struct ast_node* node, struct varenv* env)
+compresult_t lmax(const struct ast_node* node, const struct varenv* env)
 {
 	double maximum = -INFINITY;
 	while (node)
@@ -141,7 +143,7 @@ compresult_t lmax(const struct ast_node* node, struct varenv* env)
 	}
 	return COMRES_V(maximum);
 }
-compresult_t lmin(const struct ast_node* node, struct varenv* env)
+compresult_t lmin(const struct ast_node* node, const struct varenv* env)
 {
 	double minimum = INFINITY;
 	while (node)
@@ -165,7 +167,7 @@ static long long gcd(long long a, long long b)
 	}
 	return a;
 }
-compresult_t lgcd(const struct ast_node* node, struct varenv* env)
+compresult_t lgcd(const struct ast_node* node, const struct varenv* env)
 {
 	long long g = 0;
 	while (node)
@@ -185,7 +187,7 @@ static long long lcm(long long a, long long b)
 {
 	return a * b / gcd(a, b);
 }
-compresult_t llcm(const struct ast_node* node, struct varenv* env)
+compresult_t llcm(const struct ast_node* node, const struct varenv* env)
 {
 	long long g = 1;
 	while (node)
@@ -201,7 +203,7 @@ compresult_t llcm(const struct ast_node* node, struct varenv* env)
 	}
 	return COMRES_V((double)g);
 }
-compresult_t lmod(const struct ast_node* node, struct varenv* env)
+compresult_t lmod(const struct ast_node* node, const struct varenv* env)
 {
 	compresult_t dividend = compute_node(node->left, env);
 	if (!node->right) return COMRES_E(ERROR_COMPUTE_TOO_FEW_ARGUMENTS);

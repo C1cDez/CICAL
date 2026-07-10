@@ -279,6 +279,12 @@ void show_core(char c)
 	}
 }
 
+static compresult_t PREVIOUS_ANSWER = { .value = 0, .error = ERROR_COMPUTE_NO_PREVIOUS_ANSWER_KNOWN };
+struct compresult get_previous_answer(void)
+{
+	return PREVIOUS_ANSWER;
+}
+
 
 /* --------------------- PRELOAD --------------------- */
 
@@ -338,7 +344,8 @@ int execute(const struct ast_node* root, struct compresult* cr)
 	}
 	else
 	{
-		*cr = compute_node(root, 0);
+		*cr = compute_node(root, NULL);
+		if (!cr->error) PREVIOUS_ANSWER = *cr;
 		return 1;
 	}
 }
