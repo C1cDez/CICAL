@@ -8,7 +8,7 @@
 
 typedef struct
 {
-	token_t* current;
+	const token_t* current;
 	ast_node_t* node;
 } context_t;
 static context_t subctx(context_t old, int skip, ast_node_t* node)
@@ -42,13 +42,13 @@ static int parse_number(context_t ctx)
 	int skip = 1;
 
 	ctx.node->type = NODE_NUMBER;
-	ctx.node->number = strtod(ctx.current[0].data, NULL);
+	ctx.node->number = strtod((const char*)ctx.current[0].data, NULL);
 
 	if (ctx.current[skip].type == TOKEN_DOT)
 	{
 		if (ctx.current[++skip].type == TOKEN_DIGITS)
 		{
-			const char* frac_str = ctx.current[skip].data;
+			const char* frac_str = (const char*)ctx.current[skip].data;
 			int power = -(int)strlen(frac_str);
 			double frac = strtod(frac_str, NULL);
 			ctx.node->number += frac * pow(10.0, power);
@@ -70,12 +70,12 @@ static int parse_identifier(context_t ctx)
 	if (ctx.current[0].type == TOKEN_SYMBOL)
 	{
 		ctx.node->ident.type = IDENTIFIER_SYMBOL;
-		ctx.node->ident.symbol = (void*)ctx.current[0].data;
+		ctx.node->ident.symbol = (char)ctx.current[0].data;
 	}
 	else if (ctx.current[0].type == TOKEN_ALPHA)
 	{
 		ctx.node->ident.type = IDENTIFIER_ALPHA;
-		ctx.node->ident.alpha = ctx.current[0].data;
+		ctx.node->ident.alpha = (const alpha_name_t*)ctx.current[0].data;
 	}
 	else return 0;
 
@@ -83,7 +83,7 @@ static int parse_identifier(context_t ctx)
 
 	if (ctx.current[skip].type == TOKEN_DIGITS)
 	{
-		ctx.node->ident.subscript = atoi(ctx.current[skip].data);
+		ctx.node->ident.subscript = atoi((const char*)ctx.current[skip].data);
 		skip++;
 	}
 	else ctx.node->ident.subscript = -1;
@@ -108,7 +108,7 @@ static int parse_sfunction(context_t ctx)
 	skip += primeskip;
 
 	ctx.node->type = NODE_SFUNCTION;
-	ctx.node->sfunc = ctx.current[0].data;
+	ctx.node->sfunc = (const sfunc_t*)ctx.current[0].data;
 	ctx.node->left = primenode;
 	ctx.node->right = NULL;
 
@@ -120,7 +120,7 @@ static int parse_lfunction(context_t ctx)
 
 	int skip = 1;
 
-	if (!(ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].data == '('))
+	if (!(ctx.current[skip].type == TOKEN_BRACKET && (char)ctx.current[skip].data == '('))
 		return ERROR_PARSER_EXPECTED_ARGUMENT;
 
 	skip++;
@@ -136,12 +136,12 @@ static int parse_lfunction(context_t ctx)
 
 	skip += argsskip;
 
-	if (!(ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].data == ')'))
+	if (!(ctx.current[skip].type == TOKEN_BRACKET && (char)ctx.current[skip].data == ')'))
 		return ERROR_PARSER_UNCLOSED_BRACKET;
 	skip++;
 
 	ctx.node->type = NODE_LFUNCTION;
-	ctx.node->lfunc = ctx.current[0].data;
+	ctx.node->lfunc = (const lfunc_t*)ctx.current[0].data;
 	ctx.node->left = argsnode;
 	ctx.node->right = NULL;
 
@@ -156,7 +156,7 @@ static int parse_dfunction(context_t ctx)
 
 	int skip = identskip;
 
-	if (!(ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].data == '('))
+	if (!(ctx.current[skip].type == TOKEN_BRACKET && (char)ctx.current[skip].data == '('))
 		return 0;
 
 	skip++;
@@ -172,7 +172,7 @@ static int parse_dfunction(context_t ctx)
 
 	skip += argsskip;
 
-	if (!(ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].data == ')'))
+	if (!(ctx.current[skip].type == TOKEN_BRACKET && (char)ctx.current[skip].data == ')'))
 		return ERROR_PARSER_UNCLOSED_BRACKET;
 	skip++;
 
@@ -240,7 +240,7 @@ static int parse_primary(context_t ctx)
 	else if ((skip = parse_function(ctx))) return skip;
 	else if ((skip = parse_variable(ctx))) return skip;
 	else if ((skip = parse_prevanswer(ctx))) return skip;
-	else if (ctx.current[0].type == TOKEN_BRACKET && ctx.current[0].data == '(')
+	else if (ctx.current[0].type == TOKEN_BRACKET && (char)ctx.current[0].data == '(')
 	{
 		skip++;
 
@@ -255,7 +255,7 @@ static int parse_primary(context_t ctx)
 
 		skip += exprskip;
 
-		if (!(ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].data == ')'))
+		if (!(ctx.current[skip].type == TOKEN_BRACKET && (char)ctx.current[skip].data == ')'))
 			return ERROR_PARSER_UNCLOSED_BRACKET;
 
 		*ctx.node = *exprnode;
@@ -300,7 +300,7 @@ static int parse_multiple(context_t ctx)
 
 	int skip = primeskip;
 
-	if (ctx.current[skip].type == TOKEN_OPERATION && ctx.current[skip].data == '^')
+	if (ctx.current[skip].type == TOKEN_OPERATION && (char)ctx.current[skip].data == '^')
 	{
 		skip++;
 		
@@ -328,7 +328,7 @@ static int parse_multiple(context_t ctx)
 }
 static int parse_power(context_t ctx)
 {
-	if (ctx.current[0].type == TOKEN_OPERATION && ctx.current[0].data == '-')
+	if (ctx.current[0].type == TOKEN_OPERATION && (char)ctx.current[0].data == '-')
 	{
 		ast_node_t* multnode = NEW_NODE();
 		VALID_NODE(multnode);
@@ -393,7 +393,7 @@ static int parse_super(context_t ctx)
 }
 static int parse_factor(context_t ctx)
 {
-	if (ctx.current[0].type == TOKEN_OPERATION && ctx.current[0].data == '-')
+	if (ctx.current[0].type == TOKEN_OPERATION && (char)ctx.current[0].data == '-')
 	{
 		ast_node_t* supernode = NEW_NODE();
 		VALID_NODE(supernode);
@@ -426,9 +426,9 @@ static int parse_term(context_t ctx)
 
 	ast_node_t* tempnode = initfactornode;
 	while (ctx.current[skip].type == TOKEN_OPERATION && 
-		(ctx.current[skip].data == '*' || ctx.current[skip].data == '/'))
+		((char)ctx.current[skip].data == '*' || (char)ctx.current[skip].data == '/'))
 	{
-		int multop = ctx.current[skip].data == '*';
+		int multop = (char)ctx.current[skip].data == '*';
 
 		skip++;
 
@@ -471,9 +471,9 @@ static int parse_expression(context_t ctx)
 
 	ast_node_t* tempnode = inittermnode;
 	while (ctx.current[skip].type == TOKEN_OPERATION &&
-		(ctx.current[skip].data == '+' || ctx.current[skip].data == '-'))
+		((char)ctx.current[skip].data == '+' || (char)ctx.current[skip].data == '-'))
 	{
-		int addop = ctx.current[skip].data == '+';
+		int addop = (char)ctx.current[skip].data == '+';
 
 		skip++;
 
@@ -508,7 +508,7 @@ static int parse_definable(context_t ctx)
 
 	int skip = identskip;
 
-	if (!(ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].data == '('))
+	if (!(ctx.current[skip].type == TOKEN_BRACKET && (char)ctx.current[skip].data == '('))
 	{
 		ctx.node->type = NODE_VARIABLE;
 		return skip;
@@ -527,7 +527,7 @@ static int parse_definable(context_t ctx)
 
 	skip += argsskip;
 
-	if (!(ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].data == ')'))
+	if (!(ctx.current[skip].type == TOKEN_BRACKET && (char)ctx.current[skip].data == ')'))
 		return ERROR_PARSER_UNCLOSED_BRACKET;
 	skip++;
 

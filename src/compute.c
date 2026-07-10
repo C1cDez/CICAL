@@ -45,7 +45,7 @@ compresult_t compute_node(const struct ast_node* node, const varenv_t* env)
 	compresult_t rres = COMRES_E(-1);
 	if (node->right) rres = compute_node(node->right, env);
 	if (rres.error) return COMRES_E(rres.error);
-	if (isnan(rres.value)) COMRES_V(NAN);
+	if (isnan(rres.value)) return COMRES_V(NAN);
 
 	if (node->type == NODE_POW)
 		return COMRES_V(pow(lres.value, rres.value));

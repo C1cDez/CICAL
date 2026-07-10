@@ -10,11 +10,13 @@
 #include "compute.h"
 
 
-#define SILENT_PRINT "\x1b[30;1;3m"
+#define SILENT_PRINT "\x1b[2;3m"
 #define NORMAL_PRINT "\x1b[0m"
 #define PURPLE_PRINT "\x1b[35m"
 #define YELLOW_PRINT "\x1b[33m"
 #define RED_PRINT "\x1b[31m"
+#define UNDERLINED_PRINT "\x1b[4;1m"
+#define ITALIC_PRINT "\x1b[3m"
 
 static void printerr(int code)
 {
@@ -40,24 +42,47 @@ static void printerr(int code)
 	printf(NORMAL_PRINT);
 }
 
-static void list_standrard(char c)
+static void print_manual(void)
 {
-	if (c == 0 || c == 'c')
-		printf(
-			SILENT_PRINT
-			"Constants: pi = 3.141.., e = 2.718.., phi = 1.618.., tau = 6.282.., gamma = -0.577...\n"
-			"Greek alphabet: alpha, beta, gamma, mu, pi, rho, tau, phi\n"
-			NORMAL_PRINT
-		);
-	if (c == 0 || c == 'f')
-		printf(
-			SILENT_PRINT
-			"Functions:\n"
-			"* General: sqrt, cbrt, ln (log base e), lg (log base 10), log, exp, erf (error function)\n"
-			"* Trigonometry: [arc]sin[h], [arc]cos[h], [arc]tan[h], [arc]cot[h]\n"
-			"* Misc: min, max, gcd, lcm, mod\n"
-			NORMAL_PRINT
-		);
+	printf(
+		"CICAL offers easy, almost math syntax to calculate algebraic expressions.\n\n"
+
+		UNDERLINED_PRINT "Basic arithmetic operations" NORMAL_PRINT
+		" are the following: `+' (add), `-' (subtract), `*' (multiply), `/' (divide).\n"
+		"CICAL also uses `^' as exponentiation, and |x| to take absolute value.\n"
+		"Multiplication can be written implicitly (without sign) between anything, but this prioritizes it\n"
+		"over division and regular explicit (`*') multiplication.\n"
+
+		UNDERLINED_PRINT "Decimal separator" NORMAL_PRINT " for numbers is `.'\n\n"
+
+		UNDERLINED_PRINT "Variables" NORMAL_PRINT ":\n"
+		"You can use any latin symbol [a-zA-Z] and certain greek letters "
+		ITALIC_PRINT "(see below)" NORMAL_PRINT " to name a variable.\n"
+		"Variable can have a subscript (or index), which is just a number written after it.\n"
+		"To create your own variable just name it, put `=' and define its value.\n\n"
+
+		UNDERLINED_PRINT "Greek letters" NORMAL_PRINT ":\n"
+		"The following words are treated as full-fledged units: "
+		ITALIC_PRINT "alpha, beta, gamma, mu, pi, rho, tau, phi, psi.\n\n" NORMAL_PRINT
+
+		UNDERLINED_PRINT "Constants" NORMAL_PRINT ":\n"
+		"Default preloaded constants include:\n"
+		"e (Euler's number) = 2.718... ;\tpi = 3.141... ;\ttau (2pi) = 6.282...\n"
+		"phi (golden ratio) = 1.618... ;\tgamma (Euler-Mascheroni constant) = -0.577...\n\n"
+
+		UNDERLINED_PRINT "Functions" NORMAL_PRINT ":\n"
+		"General: " ITALIC_PRINT "sqrt, cbrt, ln (log base e), lg (log base 10), "
+		"log, exp, erf (error function).\n" NORMAL_PRINT
+		"Trigonometry: " ITALIC_PRINT "[arc]sin[h], [arc]cos[h], [arc]tan[h], [arc]cot[h].\n" NORMAL_PRINT
+		"Misc: " ITALIC_PRINT "min, max, gcd, lcm, mod.\n" NORMAL_PRINT
+		"You can define custom function by naming it, enumerating its arguments in parenthesis, placing `='\n"
+		"and defining it after. If ambiguity between function and variable occurs, "
+		"preference is given to a function.\n\n"
+
+		"Result of the " UNDERLINED_PRINT "previous calculation" NORMAL_PRINT " is referenced by `@'.\n\n"
+
+		NORMAL_PRINT
+	);
 }
 
 static int PRECISION = 6;
@@ -118,9 +143,9 @@ int main()
 					"!q - Quit\n"
 					"!c - Clear screen\n"
 					"!p - Set output precision\n"
-					"!u[v|f] - Un-define functions and variables\n"
-					"!l[c|f] - List standard functions and constants\n"
-					"!s[v|f] - Show defined functions and variables\n"
+					"!u[v|f] - Undefine variables and functions\n"
+					"!s[v|f] - Show defined variables and functions\n"
+					"!m - Print manual\n"
 					NORMAL_PRINT
 				);
 			}
@@ -129,7 +154,14 @@ int main()
 				printf(SILENT_PRINT "Quitting\n" NORMAL_PRINT);
 				break;
 			}
-			else if (command[0] == 'c') system("cls");
+			else if (command[0] == 'c')
+			{
+			#ifdef _WIN32
+				system("cls");
+			#else
+				system("clear");
+			#endif
+			}
 			else if (command[0] == 'p')
 			{
 				const char* num = command + 1;
@@ -144,7 +176,7 @@ int main()
 				if (command[1] == 0 || command[1] == 'f')
 					printf(SILENT_PRINT "Removed %d functions\n" NORMAL_PRINT, remove_dfuncs());
 			}
-			else if (command[0] == 'l') list_standrard(command[1]);
+			else if (command[0] == 'm') print_manual();
 			else if (command[0] == 's')
 			{
 				printf(SILENT_PRINT);

@@ -11,7 +11,7 @@
 #define countof(arr) (int)(sizeof(arr) / sizeof(arr[0]))
 
 static const alpha_name_t ALPHA_NAMES[] = {
-	{ "alpha" }, { "beta" }, { "gamma" }, { "mu" }, { "pi" }, { "rho" }, { "tau" }, { "phi" }
+	{ "alpha" }, { "beta" }, { "gamma" }, { "mu" }, { "pi" }, { "rho" }, { "tau" }, { "phi" }, { "psi" }
 };
 const alpha_name_t* get_alpha_name(const char* str)
 {
@@ -175,7 +175,7 @@ static int insert_new_dfunc(identifier_t ident, const ast_node_t* args, const as
 
 	if (i == countof(FUNCSET)) PANIC("Funcset ended");
 
-	ast_node_t* temp = args;
+	const ast_node_t* temp = args;
 	while (temp)
 	{
 		if (temp->left->type != NODE_VARIABLE) return 1;
@@ -263,7 +263,7 @@ void show_core(char c)
 
 			print_identifier(FUNCSET[i].ident);
 			putchar('(');
-			ast_node_t* arg = FUNCSET[i].args;
+			const ast_node_t* arg = FUNCSET[i].args;
 			while (arg->right)
 			{
 				print_identifier(arg->left->ident);
