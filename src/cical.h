@@ -84,7 +84,10 @@ const dfunc_t* get_dfunc(identifier_t ident);
 int remove_dfuncs(void);
 
 /* main */
+#define EXECUTE_ANNIHILATE_TREE 0x1
+#define EXECUTE_PRINT_RESULT 0x2
 int execute(const struct ast_node* root, struct compresult* cr);
+
 void preload_defaults(void);
 void annihilate_tree(const struct ast_node* node);
 void show_core(char c);

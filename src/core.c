@@ -332,20 +332,20 @@ int execute(const struct ast_node* root, struct compresult* cr)
 			if (insert_new_dfunc(root->left->ident, root->left->left, root->right))
 			{
 				cr->error = ERROR_COMPUTE_EXPECTED_ONLY_VARIABLES;
-				return 1;
+				return EXECUTE_ANNIHILATE_TREE | EXECUTE_PRINT_RESULT;
 			}
 			return 0;
 		}
 		else
 		{
 			cr->error = ERROR_COMPUTE_EXPECTED_REGULAR_DECLARATION;
-			return 1;
+			return EXECUTE_ANNIHILATE_TREE;
 		}
 	}
 	else
 	{
 		*cr = compute_node(root, NULL);
 		if (!cr->error) PREVIOUS_ANSWER = *cr;
-		return 1;
+		return EXECUTE_ANNIHILATE_TREE | EXECUTE_PRINT_RESULT;
 	}
 }

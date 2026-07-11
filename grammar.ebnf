@@ -20,4 +20,4 @@ power = [ "-" ] , multiple ;
 primary = number | function | variable | prevanswer | "(" , expression, ")" | "|" , expression , "|" ;
 
 definable = variable | identifier , "(" , arguments , ")" ;
-statement = [ definable , "=" ] , expression , $ ;
+statement = [ definable , "=" ] , expression , ( $ | ";" ) ;

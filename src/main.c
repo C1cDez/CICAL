@@ -81,9 +81,14 @@ static void print_manual(void)
 
 		"Result of the " UNDERLINED_PRINT "previous calculation" NORMAL_PRINT " is referenced by `@'.\n\n"
 
+		UNDERLINED_PRINT "Multiple expressions" NORMAL_PRINT " can be separated by `;' "
+		"if they have to be in one line, like in a program argument.\n"
+		"This is useful when you need to calculate expressions without running CICAL interpreter directly.\n\n"
+
 		NORMAL_PRINT
 	);
 }
+
 
 static int PRECISION = 6;
 
@@ -97,30 +102,115 @@ static void handle_line(const char* line)
 	int count = tokenize_line(line, TOKENS, DEFAULT_TOKENS_MAXCOUNT);
 	if (count < 0) { err = count; goto end; }
 
-	ast_node_t* node = calloc(1, sizeof(ast_node_t));
-	if (!node) PANIC("Unexpected unallocation");
-	err = parse_content(TOKENS, node);
-	cleanup_tokens(TOKENS, DEFAULT_TOKENS_MAXCOUNT);
-	if (err < 0) goto end;
-
-	compresult_t cr = { 0 };
-	if (execute(node, &cr))
+	int pos = 0;
+	while (1)
 	{
-		err = cr.error;
-		if (!err) printf(YELLOW_PRINT "= %.*f\n", PRECISION, cr.value);
-		annihilate_tree(node);
+		ast_node_t* node = calloc(1, sizeof(ast_node_t));
+		if (!node) PANIC("Unexpected unallocation");
+
+		int skip = parse_content(TOKENS + pos, node);
+		if (skip <= 0)
+		{
+			annihilate_tree(node);
+			err = skip;
+			break;
+		}
+
+		compresult_t cr = { 0 };
+		int status = execute(node, &cr);
+
+		if (status & EXECUTE_ANNIHILATE_TREE)
+			annihilate_tree(node);
+		if (status & EXECUTE_PRINT_RESULT)
+		{
+			if (cr.error)
+			{
+				err = cr.error;
+				goto end;
+			}
+			else printf(YELLOW_PRINT "= %.*f\n" NORMAL_PRINT, PRECISION, cr.value);
+		}
+
+		pos += skip;
 	}
-	else err = 0;
 
 end:
+	cleanup_tokens(TOKENS, DEFAULT_TOKENS_MAXCOUNT);
 	memset(TOKENS, 0, sizeof(TOKENS));
 	if (err) printerr(err);
 }
 
 
-int main()
+static int control_command(const char* command)
+{
+	if (command[0] == 'h')
+	{
+		printf(
+			SILENT_PRINT
+			"Control commands:\n"
+			"!q - Quit\n"
+			"!c - Clear screen\n"
+			"!p - Set output precision\n"
+			"!u[v|f] - Undefine variables and functions\n"
+			"!s[v|f] - Show defined variables and functions\n"
+			"!m - Print manual\n"
+			NORMAL_PRINT
+		);
+	}
+	else if (command[0] == 'q')
+	{
+		printf(SILENT_PRINT "Quitting\n" NORMAL_PRINT);
+		return 1;
+	}
+	else if (command[0] == 'c')
+	{
+	#ifdef _WIN32
+		system("cls");
+	#else
+		system("clear");
+	#endif
+	}
+	else if (command[0] == 'p')
+	{
+		const char* num = command + 1;
+		while (*num == ' ') num++;
+		PRECISION = atoi(num);
+		printf(SILENT_PRINT "Set output precision to %d digits\n" NORMAL_PRINT, PRECISION);
+	}
+	else if (command[0] == 'u')
+	{
+		if (command[1] == 0 || command[1] == 'v')
+			printf(SILENT_PRINT "Removed %d variables\n" NORMAL_PRINT, remove_variables());
+		if (command[1] == 0 || command[1] == 'f')
+			printf(SILENT_PRINT "Removed %d functions\n" NORMAL_PRINT, remove_dfuncs());
+	}
+	else if (command[0] == 'm') print_manual();
+	else if (command[0] == 's')
+	{
+		printf(SILENT_PRINT);
+		show_core(command[1]);
+		printf(NORMAL_PRINT);
+	}
+	else printf(RED_PRINT "Undefined control command\n" NORMAL_PRINT);
+	return 0;
+}
+
+static int args_mode(int argc, char* argv[])
+{
+	for (int i = 1; i < argc; i++)
+	{
+		if (argv[i][0] == '!') control_command(argv[i] + 1);
+		else handle_line(argv[i]);
+	}
+	return 0;
+}
+
+int main(int argc, char* argv[])
 {
 	preload_defaults();
+
+	if (argc > 1) return args_mode(argc, argv);
+
 	printf("Welcome to CICAL (C Interpretable Calculator)\n" SILENT_PRINT "Use !h for help\n" NORMAL_PRINT);
 
 	char line[128] = { 0 };
@@ -134,56 +224,7 @@ int main()
 
 		if (line[0] == '!')
 		{
-			const char* command = line + 1;
-			if (command[0] == 'h')
-			{
-				printf(
-					SILENT_PRINT
-					"Control commands:\n"
-					"!q - Quit\n"
-					"!c - Clear screen\n"
-					"!p - Set output precision\n"
-					"!u[v|f] - Undefine variables and functions\n"
-					"!s[v|f] - Show defined variables and functions\n"
-					"!m - Print manual\n"
-					NORMAL_PRINT
-				);
-			}
-			else if (command[0] == 'q')
-			{
-				printf(SILENT_PRINT "Quitting\n" NORMAL_PRINT);
-				break;
-			}
-			else if (command[0] == 'c')
-			{
-			#ifdef _WIN32
-				system("cls");
-			#else
-				system("clear");
-			#endif
-			}
-			else if (command[0] == 'p')
-			{
-				const char* num = command + 1;
-				while (*num == ' ') num++;
-				PRECISION = atoi(num);
-				printf(SILENT_PRINT "Set output precision to %d digits\n" NORMAL_PRINT, PRECISION);
-			}
-			else if (command[0] == 'u')
-			{
-				if (command[1] == 0 || command[1] == 'v')
-					printf(SILENT_PRINT "Removed %d variables\n" NORMAL_PRINT, remove_variables());
-				if (command[1] == 0 || command[1] == 'f')
-					printf(SILENT_PRINT "Removed %d functions\n" NORMAL_PRINT, remove_dfuncs());
-			}
-			else if (command[0] == 'm') print_manual();
-			else if (command[0] == 's')
-			{
-				printf(SILENT_PRINT);
-				show_core(command[1]);
-				printf(NORMAL_PRINT);
-			}
-			else printf(RED_PRINT "Undefined control command\n" NORMAL_PRINT);
+			if (control_command(line + 1)) break;
 		}
 		else if (line[0] == '/' || line[0] == 0) {}
 		else handle_line(line);

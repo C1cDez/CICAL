@@ -18,18 +18,19 @@ int tokenize_line(const char* line, token_t* tokens, int maxsize)
 		else if (c == '.') tok->type = TOKEN_DOT;
 		else if (c == '|') tok->type = TOKEN_BAR;
 		else if (c == '@') tok->type = TOKEN_AT;
+		else if (c == '_') tok->type = TOKEN_UNDERSCORE;
+		else if (c == '=') tok->type = TOKEN_EQUAL;
+		else if (c == ';') tok->type = TOKEN_SEMICOLON;
 		else if (c == '(' || c == ')')
 		{
 			tok->type = TOKEN_BRACKET;
 			tok->data = (void*)c;
 		}
-		else if (c == '_') tok->type = TOKEN_UNDERSCORE;
 		else if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^')
 		{
 			tok->type = TOKEN_OPERATION;
 			tok->data = (void*)c;
 		}
-		else if (c == '=') tok->type = TOKEN_EQUAL;
 		else if (isdigit(c))
 		{
 			tok->type = TOKEN_DIGITS;

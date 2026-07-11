@@ -547,7 +547,7 @@ static int parse_statement(context_t ctx)
 
 		int skip = parse_expression(ctx);
 		if (skip <= 0) return skip;
-		else return ctx.current[skip].type == TOKEN_EOL ? 
+		else return (ctx.current[skip].type == TOKEN_EOL || ctx.current[skip].type == TOKEN_SEMICOLON) ?
 			skip + 1 : ERROR_PARSER_NOT_FINISHED_STATEMENT;
 	}
 
@@ -564,7 +564,7 @@ static int parse_statement(context_t ctx)
 	}
 
 	skip += exprskip;
-	if (ctx.current[skip].type != TOKEN_EOL)
+	if (!(ctx.current[skip].type == TOKEN_EOL || ctx.current[skip].type == TOKEN_SEMICOLON))
 		return ERROR_PARSER_NOT_FINISHED_STATEMENT;
 	skip++;
 

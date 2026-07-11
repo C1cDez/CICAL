@@ -99,8 +99,9 @@ static compresult_t compute_dfunction(const ast_node_t* node, const varenv_t* ol
 
 		if (newenv->result.error)
 		{
+			compresult_t cr = newenv->result;
 			collapse_env(env);
-			return newenv->result;
+			return cr;
 		}
 
 		pattern = pattern->right;
