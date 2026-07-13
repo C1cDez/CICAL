@@ -36,6 +36,7 @@ void bi_free(bigint_t* bi)
 int bi_copy(bigint_t* dest, const bigint_t* src)
 {
 	if (!dest || !src) return 1;
+	if (dest == src) return 0;
 	bi_free(dest);
 	dest->dlimbs = calloc(src->size, sizeof(uint8_t));
 	if (!dest->dlimbs) return 1;
@@ -83,19 +84,11 @@ int bi_init_with_str(bigint_t* bi, const char* str)
 	int len = (int)strlen(str);
 	if (len == 0) return 1;
 
-	int off = 0;
-	if (str[0] == '-')
-	{
-		len--;
-		off = 1;
-	}
-	if (len == 0) return 1;
-
 	bi_init(bi, len);
 	bi->sign = str[0] == '-';
 
 	for (int i = 0; i < len; i++)
-		bi->dlimbs[i] = str[(len - 1) - i + off] - '0';
+		bi->dlimbs[i] = str[(len - 1) - i] - '0';
 
 	_bi_trim(bi);
 	_bi_validate_zero(bi);
@@ -125,9 +118,12 @@ int bi_init_with_i64(bigint_t* bi, int64_t x)
 	_bi_validate_zero(bi);
 	return 0;
 }
-int bi_to_str(const bigint_t* bi, char str[])
+char* bi_to_str(const bigint_t* bi)
 {
-	if (!bi || !str) return -1;
+	if (!bi) return NULL;
+
+	char* str = calloc(bi->size + (bi->sign ? 1 : 0) + 1, sizeof(char));
+	if (!str) return NULL;
 
 	int off = 0;
 	if (bi->sign)
@@ -139,7 +135,19 @@ int bi_to_str(const bigint_t* bi, char str[])
 	for (int i = 0; i < bi->size; i++)
 		str[i + off] = bi->dlimbs[(bi->size - 1) - i] + '0';
 	str[off + bi->size] = '\0';
-	return off + bi->size;
+
+	return str;
+}
+double bi_as_double(const bigint_t* bi)
+{
+	double res = 0.0;
+	double power = 1.0;
+	for (int i = 0; i < bi->size; i++)
+	{
+		res += (double)bi->dlimbs[i] * power;
+		power *= 10.0;
+	}
+	return res;
 }
 
 
@@ -169,6 +177,19 @@ int bi_cmp(const bigint_t* a, const bigint_t* b)
 	return a->sign ? -c : c;
 }
 
+int bi_negate(bigint_t* r, const bigint_t* x)
+{
+	if (bi_copy(r, x)) return 1;
+	r->sign = !x->sign;
+	_bi_validate_zero(r);
+	return 0;
+}
+int bi_abs(bigint_t* r, const bigint_t* x)
+{
+	if (bi_copy(r, x)) return 1;
+	r->sign = 0;
+	return 0;
+}
 static int _bi_add_unsigned(bigint_t* r, const bigint_t* a, const bigint_t* b)
 {
 	int maxlen = _BI_MAX_LEN(a, b), minlen = _BI_MIN_LEN(a, b);
@@ -189,7 +210,7 @@ static int _bi_add_unsigned(bigint_t* r, const bigint_t* a, const bigint_t* b)
 			carry = 1;
 		}
 		else carry = 0;
-		r->dlimbs[i] = d;
+		r->dlimbs[i] = (uint8_t)d;
 	}
 
 	const bigint_t* longer = _BI_MAX(a, b);
@@ -202,10 +223,10 @@ static int _bi_add_unsigned(bigint_t* r, const bigint_t* a, const bigint_t* b)
 			carry = 1;
 		}
 		else carry = 0;
-		r->dlimbs[i] = d;
+		r->dlimbs[i] = (uint8_t)d;
 	}
 
-	r->dlimbs[i] = carry;
+	r->dlimbs[i] = (uint8_t)carry;
 	_bi_trim(r);
 	return 0;
 }
@@ -229,7 +250,7 @@ static int _bi_sub_unsigned(bigint_t* r, const bigint_t* a, const bigint_t* b)
 			borrow = 1;
 		}
 		else borrow = 0;
-		r->dlimbs[i] = d;
+		r->dlimbs[i] = (uint8_t)d;
 	}
 
 	for (; i < maxlen; i++)
@@ -241,7 +262,7 @@ static int _bi_sub_unsigned(bigint_t* r, const bigint_t* a, const bigint_t* b)
 			borrow = 1;
 		}
 		else borrow = 0;
-		r->dlimbs[i] = d;
+		r->dlimbs[i] = (uint8_t)d;
 	}
 
 	_bi_trim(r);
@@ -375,8 +396,10 @@ int bi_div(bigint_t* quot, bigint_t* rem, const bigint_t* a, const bigint_t* b)
 		}
 		if (rem)
 		{
+			bigint_t tr = { 0 };
+			if (bi_copy(&tr, a)) return 1;
 			bi_free(rem);
-			bi_copy(rem, a);
+			*rem = tr;
 		}
 
 		return 0;
@@ -408,7 +431,7 @@ int bi_div(bigint_t* quot, bigint_t* rem, const bigint_t* a, const bigint_t* b)
 			_bi_sub_unsigned(&tr, &tr, b);
 			d++;
 		}
-		tq.dlimbs[i] = d;
+		tq.dlimbs[i] = (uint8_t)d;
 	}
 
 	_bi_trim(&tq); _bi_trim(&tr);
@@ -438,7 +461,7 @@ static int _bi_div2_and_was_odd(bigint_t* bi)
 	for (int i = bi->size - 1; i >= 0; i--)
 	{
 		int current = carry * 10 + bi->dlimbs[i];
-		bi->dlimbs[i] = current / 2;
+		bi->dlimbs[i] = (uint8_t)(current / 2);
 		carry = current % 2;
 	}
 	_bi_trim(bi);

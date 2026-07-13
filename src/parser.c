@@ -42,19 +42,26 @@ static int parse_number(context_t ctx)
 	int skip = 1;
 
 	ctx.node->type = NODE_NUMBER;
-	ctx.node->number = strtod((const char*)ctx.current[0].data, NULL);
 
-	if (ctx.current[skip].type == TOKEN_DOT)
+	if (ctx.current[skip].type == TOKEN_DOT)  /* double */
 	{
 		if (ctx.current[++skip].type == TOKEN_DIGITS)
 		{
-			const char* frac_str = (const char*)ctx.current[skip].data;
-			int power = -(int)strlen(frac_str);
-			double frac = strtod(frac_str, NULL);
-			ctx.node->number += frac * pow(10.0, power);
+			double power = -(double)strlen(ctx.current[skip].str);
+			double frac = strtod(ctx.current[skip].str, NULL);
+			double intgr = strtod(ctx.current[0].str, NULL);
+			ctx.node->number.type = NUMBER_DOUBLE;
+			ctx.node->number.doble = intgr + frac * pow(10.0, power);
 			skip++;
 		}
 		else return ERROR_PARSER_EXPECTED_NUMBER_AFTER_DOT;
+	}
+	else  /* bigint */
+	{
+		ctx.node->number.type = NUMBER_BIGINT;
+		ctx.node->number.bint = (bigint_t){ 0 };
+		if (bi_init_with_str(&ctx.node->number.bint, ctx.current[0].str))
+			return ERROR_PARSER_EXPECTED_NUMBER_TYPE;
 	}
 
 	return skip;
@@ -70,12 +77,12 @@ static int parse_identifier(context_t ctx)
 	if (ctx.current[0].type == TOKEN_SYMBOL)
 	{
 		ctx.node->ident.type = IDENTIFIER_SYMBOL;
-		ctx.node->ident.symbol = (char)ctx.current[0].data;
+		ctx.node->ident.symbol = ctx.current[0].sym;
 	}
 	else if (ctx.current[0].type == TOKEN_ALPHA)
 	{
 		ctx.node->ident.type = IDENTIFIER_ALPHA;
-		ctx.node->ident.alpha = (const alpha_name_t*)ctx.current[0].data;
+		ctx.node->ident.alpha = (const alpha_name_t*)ctx.current[0].ptr;
 	}
 	else return 0;
 
@@ -83,7 +90,7 @@ static int parse_identifier(context_t ctx)
 
 	if (ctx.current[skip].type == TOKEN_DIGITS)
 	{
-		ctx.node->ident.subscript = atoi((const char*)ctx.current[skip].data);
+		ctx.node->ident.subscript = atoi(ctx.current[skip].str);
 		skip++;
 	}
 	else ctx.node->ident.subscript = -1;
@@ -108,7 +115,7 @@ static int parse_sfunction(context_t ctx)
 	skip += primeskip;
 
 	ctx.node->type = NODE_SFUNCTION;
-	ctx.node->sfunc = (const sfunc_t*)ctx.current[0].data;
+	ctx.node->sfunc = (const sfunc_t*)ctx.current[0].ptr;
 	ctx.node->left = primenode;
 	ctx.node->right = NULL;
 
@@ -120,7 +127,7 @@ static int parse_lfunction(context_t ctx)
 
 	int skip = 1;
 
-	if (!(ctx.current[skip].type == TOKEN_BRACKET && (char)ctx.current[skip].data == '('))
+	if (!(ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].sym == '('))
 		return ERROR_PARSER_EXPECTED_ARGUMENT;
 
 	skip++;
@@ -136,12 +143,12 @@ static int parse_lfunction(context_t ctx)
 
 	skip += argsskip;
 
-	if (!(ctx.current[skip].type == TOKEN_BRACKET && (char)ctx.current[skip].data == ')'))
+	if (!(ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].sym == ')'))
 		return ERROR_PARSER_UNCLOSED_BRACKET;
 	skip++;
 
 	ctx.node->type = NODE_LFUNCTION;
-	ctx.node->lfunc = (const lfunc_t*)ctx.current[0].data;
+	ctx.node->lfunc = (const lfunc_t*)ctx.current[0].ptr;
 	ctx.node->left = argsnode;
 	ctx.node->right = NULL;
 
@@ -156,7 +163,7 @@ static int parse_dfunction(context_t ctx)
 
 	int skip = identskip;
 
-	if (!(ctx.current[skip].type == TOKEN_BRACKET && (char)ctx.current[skip].data == '('))
+	if (!(ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].sym == '('))
 		return 0;
 
 	skip++;
@@ -172,7 +179,7 @@ static int parse_dfunction(context_t ctx)
 
 	skip += argsskip;
 
-	if (!(ctx.current[skip].type == TOKEN_BRACKET && (char)ctx.current[skip].data == ')'))
+	if (!(ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].sym == ')'))
 		return ERROR_PARSER_UNCLOSED_BRACKET;
 	skip++;
 
@@ -240,7 +247,7 @@ static int parse_primary(context_t ctx)
 	else if ((skip = parse_function(ctx))) return skip;
 	else if ((skip = parse_variable(ctx))) return skip;
 	else if ((skip = parse_prevanswer(ctx))) return skip;
-	else if (ctx.current[0].type == TOKEN_BRACKET && (char)ctx.current[0].data == '(')
+	else if (ctx.current[0].type == TOKEN_BRACKET && ctx.current[0].sym == '(')
 	{
 		skip++;
 
@@ -255,7 +262,7 @@ static int parse_primary(context_t ctx)
 
 		skip += exprskip;
 
-		if (!(ctx.current[skip].type == TOKEN_BRACKET && (char)ctx.current[skip].data == ')'))
+		if (!(ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].sym == ')'))
 			return ERROR_PARSER_UNCLOSED_BRACKET;
 
 		*ctx.node = *exprnode;
@@ -300,7 +307,7 @@ static int parse_multiple(context_t ctx)
 
 	int skip = primeskip;
 
-	if (ctx.current[skip].type == TOKEN_OPERATION && (char)ctx.current[skip].data == '^')
+	if (ctx.current[skip].type == TOKEN_OPERATION && ctx.current[skip].sym == '^')
 	{
 		skip++;
 		
@@ -328,7 +335,7 @@ static int parse_multiple(context_t ctx)
 }
 static int parse_power(context_t ctx)
 {
-	if (ctx.current[0].type == TOKEN_OPERATION && (char)ctx.current[0].data == '-')
+	if (ctx.current[0].type == TOKEN_OPERATION && ctx.current[0].sym == '-')
 	{
 		ast_node_t* multnode = NEW_NODE();
 		VALID_NODE(multnode);
@@ -393,7 +400,7 @@ static int parse_super(context_t ctx)
 }
 static int parse_factor(context_t ctx)
 {
-	if (ctx.current[0].type == TOKEN_OPERATION && (char)ctx.current[0].data == '-')
+	if (ctx.current[0].type == TOKEN_OPERATION && ctx.current[0].sym == '-')
 	{
 		ast_node_t* supernode = NEW_NODE();
 		VALID_NODE(supernode);
@@ -426,9 +433,9 @@ static int parse_term(context_t ctx)
 
 	ast_node_t* tempnode = initfactornode;
 	while (ctx.current[skip].type == TOKEN_OPERATION && 
-		((char)ctx.current[skip].data == '*' || (char)ctx.current[skip].data == '/'))
+		(ctx.current[skip].sym == '*' || ctx.current[skip].sym == '/'))
 	{
-		int multop = (char)ctx.current[skip].data == '*';
+		int multop = ctx.current[skip].sym == '*';
 
 		skip++;
 
@@ -471,9 +478,9 @@ static int parse_expression(context_t ctx)
 
 	ast_node_t* tempnode = inittermnode;
 	while (ctx.current[skip].type == TOKEN_OPERATION &&
-		((char)ctx.current[skip].data == '+' || (char)ctx.current[skip].data == '-'))
+		(ctx.current[skip].sym == '+' || ctx.current[skip].sym == '-'))
 	{
-		int addop = (char)ctx.current[skip].data == '+';
+		int addop = ctx.current[skip].sym == '+';
 
 		skip++;
 
@@ -508,7 +515,7 @@ static int parse_definable(context_t ctx)
 
 	int skip = identskip;
 
-	if (!(ctx.current[skip].type == TOKEN_BRACKET && (char)ctx.current[skip].data == '('))
+	if (!(ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].sym == '('))
 	{
 		ctx.node->type = NODE_VARIABLE;
 		return skip;
@@ -527,7 +534,7 @@ static int parse_definable(context_t ctx)
 
 	skip += argsskip;
 
-	if (!(ctx.current[skip].type == TOKEN_BRACKET && (char)ctx.current[skip].data == ')'))
+	if (!(ctx.current[skip].type == TOKEN_BRACKET && ctx.current[skip].sym == ')'))
 		return ERROR_PARSER_UNCLOSED_BRACKET;
 	skip++;
 
@@ -547,7 +554,7 @@ static int parse_statement(context_t ctx)
 
 		int skip = parse_expression(ctx);
 		if (skip <= 0) return skip;
-		else return (ctx.current[skip].type == TOKEN_EOL || ctx.current[skip].type == TOKEN_SEMICOLON) ?
+		else return (ctx.current[skip].type == TOKEN_EOL) ?
 			skip + 1 : ERROR_PARSER_NOT_FINISHED_STATEMENT;
 	}
 
@@ -564,7 +571,7 @@ static int parse_statement(context_t ctx)
 	}
 
 	skip += exprskip;
-	if (!(ctx.current[skip].type == TOKEN_EOL || ctx.current[skip].type == TOKEN_SEMICOLON))
+	if (ctx.current[skip].type != TOKEN_EOL)
 		return ERROR_PARSER_NOT_FINISHED_STATEMENT;
 	skip++;
 
@@ -578,103 +585,3 @@ int parse_content(const struct token* tokens, ast_node_t* root)
 {
 	return parse_statement((context_t) { tokens, root });
 }
-
-/*
-static void debug_print_identifier(identifier_t i)
-{
-	if (i.type == IDENTIFIER_SYMBOL)
-	{
-		if (i.subscript == -1)
-			printf("%c", i.symbol);
-		else
-			printf("%c%d", i.symbol, i.subscript);
-	}
-	else
-	{
-		if (i.subscript == -1)
-			printf("%s", i.alpha->str);
-		else
-			printf("%s%d", i.alpha->str, i.subscript);
-	}
-}
-void debug_print_tree(const ast_node_t* node, int indent)
-{
-	for (int i = 0; i < indent; i++)
-		putchar('\t');
-
-	if (!node)
-	{
-		printf("<0>\n");
-		return;
-	}
-
-	switch (node->type)
-	{
-	case NODE_NUMBER:
-		printf("[NUM]: %f\n", node->number);
-		break;
-	case NODE_VARIABLE:
-		printf("[VAR]: ");
-		debug_print_identifier(node->ident);
-		putchar('\n');
-		break;
-	case NODE_POW:
-		printf("[^]:\n");
-		debug_print_tree(node->left, indent + 1);
-		debug_print_tree(node->right, indent + 1);
-		break;
-	case NODE_NEGATE:
-		printf("[-]:\n");
-		debug_print_tree(node->left, indent + 1);
-		break;
-	case NODE_MULTIPLY:
-		printf("[*]:\n");
-		debug_print_tree(node->left, indent + 1);
-		debug_print_tree(node->right, indent + 1);
-		break;
-	case NODE_DIVIDE:
-		printf("[/]:\n");
-		debug_print_tree(node->left, indent + 1);
-		debug_print_tree(node->right, indent + 1);
-		break;
-	case NODE_ADD:
-		printf("[+]:\n");
-		debug_print_tree(node->left, indent + 1);
-		debug_print_tree(node->right, indent + 1);
-		break;
-	case NODE_SUBTRACT:
-		printf("[-]:\n");
-		debug_print_tree(node->left, indent + 1);
-		debug_print_tree(node->right, indent + 1);
-		break;
-	case NODE_ABS:
-		printf("||:\n");
-		debug_print_tree(node->left, indent + 1);
-		break;
-	case NODE_ASSIGNMENT:
-		debug_print_tree(node->left, indent + 1);
-		printf("=\n");
-		debug_print_tree(node->right, indent + 1);
-		break;
-	case NODE_SFUNCTION:
-		printf("<%s>:\n", node->sfunc->name);
-		debug_print_tree(node->left, indent + 1);
-		break;
-	case NODE_LFUNCTION:
-		printf("<%s>:\n", node->sfunc->name);
-		debug_print_tree(node->left, indent + 1);
-		break;
-	case NODE_DFUNCTION:
-		printf("<");
-		debug_print_identifier(node->ident);
-		printf(">:\n");
-		debug_print_tree(node->left, indent + 1);
-		break;
-	case NODE_ARGUMENT_JOINT:
-		printf("{J}:\n");
-		debug_print_tree(node->left, indent + 1);
-		debug_print_tree(node->right, indent + 1);
-		break;
-	}
-}
-*/

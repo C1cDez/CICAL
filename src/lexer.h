@@ -17,14 +17,18 @@ enum
 	TOKEN_BAR,
 	TOKEN_AT,
 	TOKEN_EQUAL,
-	TOKEN_SEMICOLON,
 	TOKEN_EOL
 };
 
 typedef struct token
 {
 	int type;
-	void* data;
+	union
+	{
+		char sym;
+		char* str;
+		void* ptr;
+	};
 } token_t;
 
 int tokenize_line(const char* line, token_t* tokens, int maxsize);

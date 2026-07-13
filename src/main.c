@@ -24,18 +24,20 @@ static void printerr(int code)
 	switch (code)
 	{
 	case ERROR_LEXER_UNDEFINED_SYMBOL: printf("Undefined symbol.\n"); break;
-	case ERROR_PARSER_EXPECTED_NUMBER_AFTER_DOT: printf("Expected number in form N.N.\n"); break;
+	case ERROR_PARSER_EXPECTED_NUMBER_AFTER_DOT: printf("Expected number in form N[.N].\n"); break;
+	case ERROR_PARSER_EXPECTED_NUMBER_TYPE: printf("Expected number type ('z).\n"); break;
 	case ERROR_PARSER_UNCLOSED_BRACKET: printf("Unclosed bracket found.\n"); break;
 	case ERROR_PARSER_EXPECTED_ARGUMENT: printf("Function expected an argument.\n"); break;
 	case ERROR_PARSER_EXPECTED_DEFINITION: printf("Expected definition.\n"); break;
 	case ERROR_PARSER_NOT_FINISHED_STATEMENT: printf("Not finished statement.\n"); break;
 	case ERROR_COMPUTE_UNDEFINED_VARIABLE: printf("Undefined variable.\n"); break;
-	case ERROR_COMPUTE_UNDEFINED_OPERATION: printf("Undefined operation.\n"); break;
-	case ERROR_COMPUTE_UNDEFINED_FUNCTION: printf("Undefined function.\n"); break;
 	case ERROR_COMPUTE_TOO_FEW_ARGUMENTS: printf("Too few arguments for function.\n"); break;
-	case ERROR_COMPUTE_EXPECTED_REGULAR_DECLARATION: printf("Expected variable declaration.\n"); break;
 	case ERROR_COMPUTE_EXPECTED_ONLY_VARIABLES: printf("Expected only variables in function declaration.\n"); break;
 	case ERROR_COMPUTE_NO_PREVIOUS_ANSWER_KNOWN: printf("No previous answer exist.\n"); break;
+	case ERROR_COMPUTE_ILLEGAL_NUMBER_TYPE: printf("Illegal number type.\n"); break;
+	case ERROR_COMPUTE_CONVERSION_OF_NUMBER_TYPES: printf("Cannot convert number types.\n"); break;
+	case ERROR_COMPUTE_DIVISION_BY_ZERO: printf("Division by zero.\n"); break;
+	case ERROR_COMPUTE_NO_MINV_EXIST: printf("No multiplicative inverse exist.\n"); break;
 	case -1: printf("somthing went wrong.\n"); break;
 	default: printf("[UNDEFINED]\n");
 	}
@@ -63,7 +65,7 @@ static void print_manual(void)
 
 		UNDERLINED_PRINT "Greek letters" NORMAL_PRINT ":\n"
 		"The following words are treated as full-fledged units: "
-		ITALIC_PRINT "alpha, beta, gamma, mu, pi, rho, tau, phi, psi.\n\n" NORMAL_PRINT
+		ITALIC_PRINT "alpha, beta, gamma, zeta, mu, pi, rho, tau, phi, psi.\n\n" NORMAL_PRINT
 
 		UNDERLINED_PRINT "Constants" NORMAL_PRINT ":\n"
 		"Default preloaded constants include:\n"
@@ -74,23 +76,26 @@ static void print_manual(void)
 		"General: " ITALIC_PRINT "sqrt, cbrt, ln (log base e), lg (log base 10), "
 		"log, exp, erf (error function).\n" NORMAL_PRINT
 		"Trigonometry: " ITALIC_PRINT "[arc]sin[h], [arc]cos[h], [arc]tan[h], [arc]cot[h].\n" NORMAL_PRINT
-		"Misc: " ITALIC_PRINT "min, max, gcd, lcm, mod.\n" NORMAL_PRINT
+		"Number theory: " ITALIC_PRINT "gcd, lcm, mod, pow, inv.\t"
+		NORMAL_PRINT "(works only with bigints)\n"
+		"Misc: " ITALIC_PRINT "min, max.\n" NORMAL_PRINT
 		"You can define custom function by naming it, enumerating its arguments in parenthesis, placing `='\n"
 		"and defining it after. If ambiguity between function and variable occurs, "
 		"preference is given to a function.\n\n"
 
 		"Result of the " UNDERLINED_PRINT "previous calculation" NORMAL_PRINT " is referenced by `@'.\n\n"
 
-		UNDERLINED_PRINT "Multiple expressions" NORMAL_PRINT " can be separated by `;' "
-		"if they have to be in one line, like in a program argument.\n"
-		"This is useful when you need to calculate expressions without running CICAL interpreter directly.\n\n"
+		UNDERLINED_PRINT "Arbitrary sized integers" NORMAL_PRINT " (a.k.a. bigints):\n"
+		"If you type a number without a decimal separator, it will be converted to bigint.\n"
+		"Bigints can have any number of digits (ofc until RAM ends) without loss of precision.\n"
+		"Certain functions, such as those related to number theory, can work only with bigints.\n"
+		"If bigint have to interact with regular `double' numbers, int will be converted to double,\n"
+		"which may lead to precision loss.\n"
 
 		NORMAL_PRINT
 	);
 }
 
-
-static int PRECISION = 6;
 
 #define DEFAULT_TOKENS_MAXCOUNT 1024
 static token_t TOKENS[DEFAULT_TOKENS_MAXCOUNT] = { 0 };
@@ -102,38 +107,35 @@ static void handle_line(const char* line)
 	int count = tokenize_line(line, TOKENS, DEFAULT_TOKENS_MAXCOUNT);
 	if (count < 0) { err = count; goto end; }
 
-	int pos = 0;
-	while (1)
+	ast_node_t* node = calloc(1, sizeof(ast_node_t));
+	if (!node) PANIC("Unexpected unallocation");
+	err = parse_content(TOKENS, node);
+	if (err <= 0) goto end;
+
+	compresult_t cr = { 0 };
+	int status = execute(node, &cr);
+
+	if (status & EXECUTE_PRINT_RESULT)
 	{
-		ast_node_t* node = calloc(1, sizeof(ast_node_t));
-		if (!node) PANIC("Unexpected unallocation");
-
-		int skip = parse_content(TOKENS + pos, node);
-		if (skip <= 0)
+		if (cr.error)
 		{
-			annihilate_tree(node);
-			err = skip;
-			break;
+			err = cr.error;
+			goto end;
 		}
 
-		compresult_t cr = { 0 };
-		int status = execute(node, &cr);
-
-		if (status & EXECUTE_ANNIHILATE_TREE)
-			annihilate_tree(node);
-		if (status & EXECUTE_PRINT_RESULT)
+		if (cr.value.type == NUMBER_DOUBLE)
+			printf(YELLOW_PRINT "= %.*f\n" NORMAL_PRINT, get_precision(), cr.value.doble);
+		else if (cr.value.type == NUMBER_BIGINT)
 		{
-			if (cr.error)
-			{
-				err = cr.error;
-				goto end;
-			}
-			else printf(YELLOW_PRINT "= %.*f\n" NORMAL_PRINT, PRECISION, cr.value);
+			char* buff = bi_to_str(&cr.value.bint);
+			printf(YELLOW_PRINT "= %s\n" NORMAL_PRINT, buff);
+			free(buff);
 		}
-
-		pos += skip;
 	}
+	if (status & EXECUTE_ANNIHILATE_TREE)
+		annihilate_tree(node);
 
+	err = 0;
 end:
 	cleanup_tokens(TOKENS, DEFAULT_TOKENS_MAXCOUNT);
 	memset(TOKENS, 0, sizeof(TOKENS));
@@ -150,8 +152,8 @@ static int control_command(const char* command)
 			"Control commands:\n"
 			"!q - Quit\n"
 			"!c - Clear screen\n"
-			"!p - Set output precision\n"
-			"!u[v|f] - Undefine variables and functions\n"
+			"!p - Set precision\n"
+			"!u[v|f] - Undefine all variables and functions\n"
 			"!s[v|f] - Show defined variables and functions\n"
 			"!m - Print manual\n"
 			NORMAL_PRINT
@@ -174,8 +176,8 @@ static int control_command(const char* command)
 	{
 		const char* num = command + 1;
 		while (*num == ' ') num++;
-		PRECISION = atoi(num);
-		printf(SILENT_PRINT "Set output precision to %d digits\n" NORMAL_PRINT, PRECISION);
+		set_precision(atoi(num));
+		printf(SILENT_PRINT "Set output precision to %d digits\n" NORMAL_PRINT, get_precision());
 	}
 	else if (command[0] == 'u')
 	{
@@ -213,7 +215,7 @@ int main(int argc, char* argv[])
 
 	printf("Welcome to CICAL (C Interpretable Calculator)\n" SILENT_PRINT "Use !h for help\n" NORMAL_PRINT);
 
-	char line[128] = { 0 };
+	char line[512] = { 0 };
 	while (1)
 	{
 		printf(PURPLE_PRINT ">>>" NORMAL_PRINT " ");

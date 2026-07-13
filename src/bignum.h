@@ -19,11 +19,14 @@ int bi_copy(bigint_t* dest, const bigint_t* src);
 
 int bi_init_with_str(bigint_t* bi, const char* str);
 int bi_init_with_i64(bigint_t* bi, int64_t x);
-int bi_to_str(const bigint_t* bi, char str[/* .bi->size + 2 */]);
+char* bi_to_str(const bigint_t* bi);
+double bi_as_double(const bigint_t* bi);
 
 int bi_cmp(const bigint_t* a, const bigint_t* b);
 int bi_is_zero(const bigint_t* bi);
 
+int bi_negate(bigint_t* r, const bigint_t* x);
+int bi_abs(bigint_t* r, const bigint_t* x);
 int bi_add(bigint_t* sum, const bigint_t* a, const bigint_t* b);
 int bi_sub(bigint_t* diff, const bigint_t* a, const bigint_t* b);
 int bi_mul(bigint_t* prod, const bigint_t* a, const bigint_t* b);

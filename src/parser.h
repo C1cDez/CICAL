@@ -26,10 +26,10 @@ typedef struct ast_node
 	int type;
 	union
 	{
-		double number;
+		number_t number;
 		identifier_t ident;
-		sfunc_t* sfunc;
-		lfunc_t* lfunc;
+		const sfunc_t* sfunc;
+		const lfunc_t* lfunc;
 	};
 	struct ast_node* left, * right;
 } ast_node_t;

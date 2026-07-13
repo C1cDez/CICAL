@@ -11,7 +11,8 @@
 #define countof(arr) (int)(sizeof(arr) / sizeof(arr[0]))
 
 static const alpha_name_t ALPHA_NAMES[] = {
-	{ "alpha" }, { "beta" }, { "gamma" }, { "mu" }, { "pi" }, { "rho" }, { "tau" }, { "phi" }, { "psi" }
+	{ "alpha" }, { "beta" }, { "gamma" }, { "zeta" }, { "mu" }, 
+	{ "pi" }, { "rho" }, { "tau" }, { "phi" }, { "psi" }
 };
 const alpha_name_t* get_alpha_name(const char* str)
 {
@@ -82,8 +83,10 @@ static void declare_sfuncs(void)
 static lfunc_t LFUNCS[] = {
 	{ "log" },
 	{ "max" }, { "min" },
+	/* int funcs */
 	{ "lcm" }, { "gcd" },
-	{ "mod" },
+	{ "mod" }, { "pow" }, { "inv" },
+	{ "ppr" }
 };
 const lfunc_t* get_lfunc(const char* str)
 {
@@ -102,6 +105,9 @@ static void declare_lfuncs(void)
 	LFUNCS[3].logic = llcm;
 	LFUNCS[4].logic = lgcd;
 	LFUNCS[5].logic = lmod;
+	LFUNCS[6].logic = lpow;
+	LFUNCS[7].logic = linv;
+	LFUNCS[8].logic = lppr;
 }
 
 
@@ -216,24 +222,21 @@ void annihilate_tree(const struct ast_node* node)
 	if (!node) return;
 	if (node->left) annihilate_tree(node->left);
 	if (node->right) annihilate_tree(node->right);
+	
+	if (node->type == NODE_NUMBER && node->number.type == NUMBER_BIGINT)
+		bi_free(&node->number.bint);
+
 	free(node);
 }
 static void print_identifier(identifier_t i)
 {
 	if (i.type == IDENTIFIER_SYMBOL)
-	{
-		if (i.subscript == -1)
-			printf("%c", i.symbol);
-		else
-			printf("%c%d", i.symbol, i.subscript);
-	}
+		printf("%c", i.symbol);
 	else if (i.type == IDENTIFIER_ALPHA)
-	{
-		if (i.subscript == -1)
-			printf("%s", i.alpha->str);
-		else
-			printf("%s%d", i.alpha->str, i.subscript);
-	}
+		printf("%s", i.alpha->str);
+
+	if (i.subscript != -1)
+		printf("%d", i.subscript);
 }
 void show_core(char c)
 {
@@ -279,10 +282,29 @@ void show_core(char c)
 	}
 }
 
-static compresult_t PREVIOUS_ANSWER = { .value = 0, .error = ERROR_COMPUTE_NO_PREVIOUS_ANSWER_KNOWN };
+static compresult_t PREVIOUS_ANSWER = { .value = { 0 }, .error = ERROR_COMPUTE_NO_PREVIOUS_ANSWER_KNOWN };
 struct compresult get_previous_answer(void)
 {
-	return PREVIOUS_ANSWER;
+	if (PREVIOUS_ANSWER.value.type == NUMBER_DOUBLE)
+		return PREVIOUS_ANSWER;
+	else if (PREVIOUS_ANSWER.value.type == NUMBER_BIGINT)
+	{
+		/* do NOT transfer ownership */
+		bigint_t cpy = { 0 };
+		bi_copy(&cpy, &PREVIOUS_ANSWER.value.bint);
+		return (compresult_t) { .value = { .type = NUMBER_BIGINT, .bint = cpy }, .error = 0 };
+	}
+	else return PREVIOUS_ANSWER;
+}
+
+static int PRECISION = 6;
+int get_precision(void)
+{
+	return PRECISION;
+}
+void set_precision(int precision)
+{
+	if (precision >= 0) PRECISION = precision;
 }
 
 
@@ -293,7 +315,8 @@ static void preload_consts(identifier_t ident, double value)
 	ast_node_t* node = calloc(1, sizeof(ast_node_t));
 	if (!node) PANIC("Undefined unallocation");
 	node->type = NODE_NUMBER;
-	node->number = value;
+	node->number.type = NUMBER_DOUBLE;
+	node->number.doble = value;
 	insert_new_variable(ident, node, 0);
 }
 void preload_defaults(void)
@@ -338,14 +361,19 @@ int execute(const struct ast_node* root, struct compresult* cr)
 		}
 		else
 		{
-			cr->error = ERROR_COMPUTE_EXPECTED_REGULAR_DECLARATION;
+			cr->error = -1;
 			return EXECUTE_ANNIHILATE_TREE;
 		}
 	}
 	else
 	{
 		*cr = compute_node(root, NULL);
-		if (!cr->error) PREVIOUS_ANSWER = *cr;
+		if (!cr->error)
+		{
+			if (PREVIOUS_ANSWER.value.type == NUMBER_BIGINT)
+				bi_free(&PREVIOUS_ANSWER.value.bint);
+			PREVIOUS_ANSWER = *cr;
+		}
 		return EXECUTE_ANNIHILATE_TREE | EXECUTE_PRINT_RESULT;
 	}
 }
