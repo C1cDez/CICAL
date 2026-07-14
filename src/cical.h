@@ -104,6 +104,7 @@ int remove_dfuncs(void);
 /* main */
 #define EXECUTE_ANNIHILATE_TREE 0x1
 #define EXECUTE_PRINT_RESULT 0x2
+#define EXECUTE_FREE_DEFINABLE 0x4
 int execute(const struct ast_node* root, struct compresult* cr);
 
 void preload_defaults(void);

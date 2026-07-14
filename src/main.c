@@ -134,6 +134,11 @@ static void handle_line(const char* line)
 	}
 	if (status & EXECUTE_ANNIHILATE_TREE)
 		annihilate_tree(node);
+	if (status & EXECUTE_FREE_DEFINABLE)
+	{
+		free(node->left);
+		free(node);
+	}
 
 	err = 0;
 end:
@@ -197,13 +202,25 @@ static int control_command(const char* command)
 	return 0;
 }
 
+#define INPUT_LINE_SIZE 512
 static int args_mode(int argc, char* argv[])
 {
+	char line[INPUT_LINE_SIZE] = { 0 };
+	int pos = 0;
 	for (int i = 1; i < argc; i++)
 	{
-		if (argv[i][0] == '!') control_command(argv[i] + 1);
-		else handle_line(argv[i]);
+		char* arg = argv[i];
+		strcpy(line + pos, arg);
+		pos += (int)strlen(arg);
 	}
+
+	char* statement = strtok(line, ";");
+	while (statement)
+	{
+		handle_line(statement);
+		statement = strtok(NULL, ";");
+	}
+
 	return 0;
 }
 
@@ -215,7 +232,7 @@ int main(int argc, char* argv[])
 
 	printf("Welcome to CICAL (C Interpretable Calculator)\n" SILENT_PRINT "Use !h for help\n" NORMAL_PRINT);
 
-	char line[512] = { 0 };
+	char line[INPUT_LINE_SIZE] = { 0 };
 	while (1)
 	{
 		printf(PURPLE_PRINT ">>>" NORMAL_PRINT " ");

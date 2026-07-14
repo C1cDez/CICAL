@@ -285,9 +285,7 @@ void show_core(char c)
 static compresult_t PREVIOUS_ANSWER = { .value = { 0 }, .error = ERROR_COMPUTE_NO_PREVIOUS_ANSWER_KNOWN };
 struct compresult get_previous_answer(void)
 {
-	if (PREVIOUS_ANSWER.value.type == NUMBER_DOUBLE)
-		return PREVIOUS_ANSWER;
-	else if (PREVIOUS_ANSWER.value.type == NUMBER_BIGINT)
+	if (PREVIOUS_ANSWER.value.type == NUMBER_BIGINT)
 	{
 		/* do NOT transfer ownership */
 		bigint_t cpy = { 0 };
@@ -348,7 +346,7 @@ int execute(const struct ast_node* root, struct compresult* cr)
 		if (root->left->type == NODE_VARIABLE)
 		{
 			insert_new_variable(root->left->ident, root->right, 1);
-			return 0;
+			return EXECUTE_FREE_DEFINABLE;
 		}
 		else if (root->left->type == NODE_DFUNCTION)
 		{
@@ -357,7 +355,7 @@ int execute(const struct ast_node* root, struct compresult* cr)
 				cr->error = ERROR_COMPUTE_EXPECTED_ONLY_VARIABLES;
 				return EXECUTE_ANNIHILATE_TREE | EXECUTE_PRINT_RESULT;
 			}
-			return 0;
+			else return EXECUTE_FREE_DEFINABLE;
 		}
 		else
 		{
