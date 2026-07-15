@@ -100,7 +100,6 @@ compresult_t compute_node(const struct ast_node* node, varenv_t* env)
 	else if (node->type == NODE_SUBTRACT)
 		return compute_subtract(lres, rres);
 
-	collapse_env(env);
 	return COMRES_E(-1);
 }
 
@@ -176,7 +175,9 @@ static compresult_t compute_dfunction(const ast_node_t* node, varenv_t* oldenv)
 		args = args->right;
 	}
 
-	return compute_node(dfunc->impl, env);
+	compresult_t res = compute_node(dfunc->impl, env);
+	collapse_env(env);
+	return res;
 }
 static compresult_t compute_pow(compresult_t lres, compresult_t rres)
 {
