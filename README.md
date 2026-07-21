@@ -6,6 +6,35 @@ and dynamic variable reassignment.
 
 ---
 
+## Installation
+
+### Building
+For **Windows**:
+```bat
+gcc src/*.c -o cical.exe
+```
+
+For **Linux**:
+```bash
+gcc src/*.c -o cical -lm
+```
+
+*(Please ignore all compiler warnings).*
+
+### Running
+```bash
+cical
+```
+
+Or *(for instant calculations)*:
+```bash
+cical expr1 ; expr2 ; ... 
+```
+Expressions can be written without quotes (`'` or `"`),
+but must be separated by semicolons `;`.
+
+---
+
 ## User manual
 
 This manual describes end-user interaction with CICAL.
@@ -47,7 +76,7 @@ You can define custom function by naming it, enumerating its arguments in parent
 and defining it after. If ambiguity between function and variable occurs,
 preference is given to a function.
 
-**Previous result** *(or `Ans` on real calculator)* is referenced by `@` sign.'
+**Previous result** *(or `Ans` on real calculator)* is referenced by `@` sign.
 
 **Control commands** are simple shortcuts to control calculator behaviour.
 * `!h` - Lists control commands.
